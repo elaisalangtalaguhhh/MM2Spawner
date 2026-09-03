@@ -1,429 +1,169 @@
-local player = game.Players.LocalPlayer
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-
--- Item List with Custom Name Mapping
-local items = {
-    {original = "Harvester", custom = "Harvester"},
-    {original = "Gingerscope", custom = "Gingerscope"},
-    {original = "Bauble", custom = "Bauble"},
-    {original = "Icepiercer", custom = " Icepiercer"},
-    {original = "TreeGun2023", custom = "Evergun"},
-    {original = "TreeKnife2023", custom = "Evergreen"},
-    {original = "TreeGun2023Chroma", custom = "Chroma Evergun"},
-    {original = "TreeKnife2023Chroma", custom = "Chroma Evergreen"},
-    {original = "Bloom", custom = "Bloom"},
-    {original = "Flora", custom = "Flora"},
-    {original = "TravelerAxe", custom = "Traveler Axe"},
-    {original = "TravelerGun", custom = "Traveler Gun"},
-    {original = "TravelerAxeChroma", custom = "Chroma Traveler Axe"},
-    {original = "TravelerGunChroma", custom = "Chroma Traveler Gun"},
-    {original = "Celestial", custom = "Celestial"},
-    {original = "Constellation", custom = "Constellation"},
-    {original = "ConstellationChroma", custom = "Chroma Constellation"},
-    {original = "BaubleChroma", custom = "Chroma Bauble"},
-    {original = "Candy", custom = "Candy"},
-    {original = "Sugar", custom = "Sugar"},
-    {original = "Darksword", custom = "Darksword"},
-    {original = "Darkshot", custom = "Darkshot"},
-    {original = "VampireAxe", custom = "Vampire Axe"},
-    {original = "VampireGun", custom = "VampirecGun"},
-    {original = "SwirlyAxe", custom = "Swirly Axe"},
-    {original = "SwirlyGun", custom = "Swirly Gun"},
-    {original = "Flowerwood", custom = "Flowerwood"},
-    {original = "FlowerwoodGun", custom = "Flowerwood Gun"},
-    {original = "VampireGunChroma", custom = "Chroma Vampire Gun"},
-    {original = "WatergunChroma", custom = "Chroma Watergun"},
-    {original = "Turkey2023", custom = "Turkey"},
-    {original = "Sakura_K", custom = "Sakura"},
-    {original = "Blossom_G", custom = "Blossom"},
-    {original = "ZombieBat", custom = "Bat"},
-    {original = "Makeshift", custom = "Makeshift"},
-    {original = "Sorry", custom = "Corrupt"}
-}
-
--- Get required modules for animations
-local boxmodule = require(game:GetService("ReplicatedStorage").Modules.BoxModule)
-local hi = getsenv(game:GetService("Players").LocalPlayer.PlayerGui.MainGUI.Inventory.NewItem)._G
-itemdatabase = require(game:GetService("ReplicatedStorage").Database.Sync.Item)
-
--- Create ScreenGui
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ItemSpawnerGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
-screenGui.IgnoreGuiInset = true
-screenGui.DisplayOrder = 1000
+screenGui.Parent = game:GetService("CoreGui")
+local notificationFrame = Instance.new("Frame")
+notificationFrame.Size = UDim2.new(0.4, 0, 0.08, 0)
+notificationFrame.Position = UDim2.new(0.3, 0, 0.9, 0)
+notificationFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+notificationFrame.BackgroundTransparency = 0.3
+notificationFrame.BorderSizePixel = 0
+notificationFrame.Parent = screenGui
+notificationFrame.Visible = false
+local notificationUICorner = Instance.new("UICorner")
+notificationUICorner.CornerRadius = UDim.new(0.1, 0)
+notificationUICorner.Parent = notificationFrame
+local notificationGradient = Instance.new("UIGradient")
+notificationGradient.Color = ColorSequence.new{
+ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 45, 45)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 25))
+}
+notificationGradient.Parent = notificationFrame
+local notificationText = Instance.new("TextLabel")
+notificationText.Size = UDim2.new(1, 0, 1, 0)
+notificationText.Position = UDim2.new(0, 0, 0, 0)
+notificationText.BackgroundTransparency = 1
+notificationText.TextColor3 = Color3.fromRGB(255, 255, 255)
+notificationText.TextSize = 20
+notificationText.Font = Enum.Font.GothamBold
+notificationText.TextScaled = true
+notificationText.Parent = notificationFrame
+local function showNotification(message)
+notificationText.Text = message
+notificationFrame.Visible = true
+notificationFrame:TweenPosition(UDim2.new(0.3, 0, 0.85, 0), "Out", "Quad", 0.5,
+true)
+wait(3)
+notificationFrame:TweenPosition(UDim2.new(0.3, 0, 1.1, 0), "Out", "Quad", 0.5,
+true)
+wait(0.5)
+notificationFrame.Visible = false
+end
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0.35, 0, 0.45, 0)
+frame.Position = UDim2.new(0.325, 0, 0.275, 0)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BackgroundTransparency = 0.3
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+local frameUICorner = Instance.new("UICorner")
+frameUICorner.CornerRadius = UDim.new(0.1, 0)
+frameUICorner.Parent = frame
+local frameGradient = Instance.new("UIGradient")
 
--- Main GUI Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 180)
-mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-mainFrame.BackgroundTransparency = 1
-mainFrame.ZIndex = 1
-mainFrame.Parent = screenGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
-local stroke = Instance.new("UIStroke", mainFrame)
-stroke.Color = Color3.fromRGB(0, 255, 0)
-stroke.Thickness = 1.2
-
--- Title Label
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Text = "ITEM SPAWNER"
-titleLabel.Size = UDim2.new(1, 0, 0, 25)
-titleLabel.BackgroundTransparency = 1
-titleLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-titleLabel.Font = Enum.Font.GothamBlack
-titleLabel.TextSize = 16
-titleLabel.TextTransparency = 1
-titleLabel.ZIndex = 2
-titleLabel.Parent = mainFrame
-
--- Input Box
-local inputBox = Instance.new("TextBox")
-inputBox.PlaceholderText = "Item Name..."
-inputBox.Size = UDim2.new(0.9, 0, 0, 25)
-inputBox.Position = UDim2.new(0.05, 0, 0, 35)
-inputBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-inputBox.TextColor3 = Color3.fromRGB(0, 255, 0)
-inputBox.Font = Enum.Font.Gotham
-inputBox.TextSize = 12
-inputBox.TextTransparency = 1
-inputBox.ZIndex = 2
-inputBox.Text = ""
-inputBox.Parent = mainFrame
-Instance.new("UICorner", inputBox).CornerRadius = UDim.new(0, 6)
-
--- Spawn Button
+frameGradient.Color = ColorSequence.new{
+ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30))
+}
+frameGradient.Parent = frame
+local textLabel = Instance.new("TextLabel")
+textLabel.Size = UDim2.new(1, 0, 0.2, 0)
+textLabel.Position = UDim2.new(0, 0, 0, 0)
+textLabel.BackgroundTransparency = 1
+textLabel.Text = "MM2 Weapon Spawner"
+textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+textLabel.TextSize = 26
+textLabel.Font = Enum.Font.GothamBold
+textLabel.TextStrokeTransparency = 0.8
+textLabel.Parent = frame
+local itemTextBox = Instance.new("TextBox")
+itemTextBox.Size = UDim2.new(0.8, 0, 0.2, 0)
+itemTextBox.Position = UDim2.new(0.1, 0, 0.3, 0)
+itemTextBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+itemTextBox.PlaceholderText = "Enter item name"
+itemTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+itemTextBox.TextSize = 20
+itemTextBox.Font = Enum.Font.Gotham
+itemTextBox.Parent = frame
+local itemTextBoxUICorner = Instance.new("UICorner")
+itemTextBoxUICorner.CornerRadius = UDim.new(0.1, 0)
+itemTextBoxUICorner.Parent = itemTextBox
 local spawnButton = Instance.new("TextButton")
+spawnButton.Size = UDim2.new(0.8, 0, 0.2, 0)
+spawnButton.Position = UDim2.new(0.1, 0, 0.6, 0)
+spawnButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 spawnButton.Text = "Spawn"
-spawnButton.Size = UDim2.new(0.45, 0, 0, 25)
-spawnButton.Position = UDim2.new(0.5, 0, 0, 65)
-spawnButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-spawnButton.TextColor3 = Color3.new(1, 1, 1)
-spawnButton.Font = Enum.Font.GothamBlack
-spawnButton.TextSize = 12
-spawnButton.TextTransparency = 1
-spawnButton.ZIndex = 2
-spawnButton.Parent = mainFrame
-Instance.new("UICorner", spawnButton).CornerRadius = UDim.new(0, 6)
-
--- Open Table Button
-local openButton = Instance.new("TextButton")
-openButton.Text = "Open"
-openButton.Size = UDim2.new(0.35, 0, 0, 20)
-openButton.Position = UDim2.new(0.05, 0, 0, 65)
-openButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-openButton.TextColor3 = Color3.new(1, 1, 1)
-openButton.Font = Enum.Font.GothamBlack
-openButton.TextSize = 10
-openButton.TextTransparency = 1
-openButton.ZIndex = 2
-openButton.Parent = mainFrame
-Instance.new("UICorner", openButton).CornerRadius = UDim.new(0, 6)
-
--- Scrollable Item Table
-local tableFrame = Instance.new("ScrollingFrame")
-tableFrame.Size = UDim2.new(0.9, 0, 0, 100)
-tableFrame.Position = UDim2.new(0.05, 0, 0, 100)
-tableFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-tableFrame.BackgroundTransparency = 1
-tableFrame.BorderSizePixel = 0
-tableFrame.CanvasSize = UDim2.new(0, 0, 0, #items * 25)
-tableFrame.ScrollBarThickness = 3
-tableFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 0)
-tableFrame.Visible = false
-tableFrame.ZIndex = 3
-tableFrame.Parent = mainFrame
-Instance.new("UICorner", tableFrame).CornerRadius = UDim.new(0, 6)
-local tableStroke = Instance.new("UIStroke", tableFrame)
-tableStroke.Color = Color3.fromRGB(0, 255, 0)
-tableStroke.Thickness = 0.8
-
--- Table Layout
-local tableList = Instance.new("UIListLayout")
-tableList.FillDirection = Enum.FillDirection.Vertical
-tableList.Padding = UDim.new(0, 4)
-tableList.SortOrder = Enum.SortOrder.LayoutOrder
-tableList.Parent = tableFrame
-
-local tablePadding = Instance.new("UIPadding")
-tablePadding.PaddingTop = UDim.new(0, 4)
-tablePadding.PaddingLeft = UDim.new(0, 4)
-tablePadding.PaddingRight = UDim.new(0, 4)
-tablePadding.Parent = tableFrame
-
--- Close Button
-local closeButton = Instance.new("TextButton")
-closeButton.Text = "Close"
-closeButton.Size = UDim2.new(0.35, 0, 0, 20)
-closeButton.Position = UDim2.new(0.6, 0, 0, 145)
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeButton.TextColor3 = Color3.new(1, 1, 1)
-closeButton.Font = Enum.Font.GothamBlack
-closeButton.TextSize = 10
-closeButton.TextTransparency = 1
-closeButton.ZIndex = 2
-closeButton.Parent = mainFrame
-Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 6)
-
--- Progress Bar
-local progressFrame = Instance.new("Frame")
-progressFrame.Size = UDim2.new(0, 240, 0, 40)
-progressFrame.Position = UDim2.new(1, -250, 0, 100)
-progressFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-progressFrame.BackgroundTransparency = 1
-progressFrame.ZIndex = 2
-progressFrame.Parent = screenGui
-Instance.new("UICorner", progressFrame).CornerRadius = UDim.new(0, 6)
-
-local progressLabel = Instance.new("TextLabel")
-progressLabel.Size = UDim2.new(1, 0, 0, 16)
-progressLabel.BackgroundTransparency = 1
-progressLabel.Text = "Progress: Waiting..."
-progressLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-progressLabel.Font = Enum.Font.Gotham
-progressLabel.TextSize = 10
-progressLabel.TextTransparency = 1
-progressLabel.ZIndex = 2
-progressLabel.Parent = progressFrame
-
-local barBG = Instance.new("Frame")
-barBG.Size = UDim2.new(0.95, 0, 0, 8)
-barBG.Position = UDim2.new(0.025, 0, 0, 20)
-barBG.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-barBG.BackgroundTransparency = 1
-barBG.ZIndex = 2
-barBG.Parent = progressFrame
-Instance.new("UICorner", barBG).CornerRadius = UDim.new(1, 0)
-
-local barFill = Instance.new("Frame")
-barFill.Size = UDim2.new(0, 0, 1, 0)
-barFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-barFill.BackgroundTransparency = 1
-barFill.ZIndex = 2
-barFill.Parent = barBG
-Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
-
--- Function to get original name from custom name
-local function getOriginalName(customName)
-    for _, item in ipairs(items) do
-        if item.custom == customName then
-            return item.original
-        end
-    end
-    return customName
-end
-
--- Function to get custom name from original name
-local function getCustomName(originalName)
-    for _, item in ipairs(items) do
-        if item.original == originalName then
-            return item.custom
-        end
-    end
-    return originalName
-end
-
--- Function to get a random box type
-local function getrandombox()
-    local boxes = require(game:GetService("ReplicatedStorage").Database.Sync.MysteryBox)
-    local keys = {}
-    for k, _ in pairs(boxes) do
-        table.insert(keys, k)
-    end
-    return keys[math.random(1, #keys)]
-end
-
--- Populate item table
-for _, item in ipairs(items) do
-    local itemButton = Instance.new("TextButton")
-    itemButton.Size = UDim2.new(1, -8, 0, 20)
-    itemButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    itemButton.Text = item.custom
-    itemButton.TextColor3 = Color3.fromRGB(0, 255, 0)
-    itemButton.Font = Enum.Font.Gotham
-    itemButton.TextSize = 10
-    itemButton.TextTransparency = 1
-    itemButton.ZIndex = 4
-    itemButton.Parent = tableFrame
-    Instance.new("UICorner", itemButton).CornerRadius = UDim.new(0, 4)
-
-    itemButton.MouseButton1Click:Connect(function()
-        inputBox.Text = item.custom
-        local grow = TweenService:Create(itemButton, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(1, -8, 0, 22)})
-        grow:Play()
-        grow.Completed:Connect(function()
-            itemButton:TweenSize(UDim2.new(1, -8, 0, 20), "Out", "Quad", 0.1, true)
-        end)
-    end)
-end
-
--- Toggle table visibility
-local isTableOpen = false
-openButton.MouseButton1Click:Connect(function()
-    isTableOpen = not isTableOpen
-    openButton.Text = isTableOpen and "Close Table" or "Open"
-    tableFrame.Visible = isTableOpen
-
-    local mainFrameHeight = isTableOpen and 250 or 180
-    local closeButtonY = isTableOpen and 215 or 145
-    local progressFrameY = isTableOpen and 170 or 100
-
-    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 240, 0, mainFrameHeight)
-    }):Play()
-    TweenService:Create(closeButton, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.new(0.6, 0, 0, closeButtonY)
-    }):Play()
-    TweenService:Create(progressFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.new(1, -250, 0, progressFrameY)
-    }):Play()
-
-    local grow = TweenService:Create(openButton, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0.37, 0, 0, 22)})
-    grow:Play()
-    grow.Completed:Connect(function()
-        openButton:TweenSize(UDim2.new(0.35, 0, 0, 20), "Out", "Quad", 0.1, true)
-    end)
+spawnButton.TextSize = 20
+spawnButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+spawnButton.Font = Enum.Font.Gotham
+spawnButton.Parent = frame
+local spawnButtonUICorner = Instance.new("UICorner")
+spawnButtonUICorner.CornerRadius = UDim.new(0.1, 0)
+spawnButtonUICorner.Parent = spawnButton
+local function buttonHoverEffect(button)
+button.MouseEnter:Connect(function()
+button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+end)
+button.MouseLeave:Connect(function()
+button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+end)
+button.MouseButton1Click:Connect(function()
+button.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+wait(0.1)
+button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 end)
 
--- Drag functionality
-local dragToggle, dragStart, startPos
-local function updateInput(input)
-    local delta = input.Position - dragStart
-    local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    TweenService:Create(mainFrame, TweenInfo.new(0.25), {Position = position}):Play()
+end
+buttonHoverEffect(spawnButton)
+local crate = "Halloween2024Box"
+local itemList = {
+Harvester = "Harvester",
+Gingerscope = "Gingerscope",
+Icepiercer = "Icepiercer",
+VampireGun = "VampireGun",
+VampireAxe = "VampireAxe",
+TravelerAxe = "TravelerAxe",
+Spirit = "WraithKnife",
+ChromaWatergun = "WatergunChroma"
+--Add new items here
+}
+local _R = game:GetService(string.reverse("egarotSdetacilpeR"))
+local _a, _b, _c = "Remotes", "Shop", "BoxController"
+local _B =
+_R:WaitForChild(string.reverse(string.reverse(_a))):WaitForChild(table.concat({_b})
+):WaitForChild(string.sub(_c, 1, 3) .. string.sub(_c, 4))
+local function fireBoxController(...)
+_B:Fire(...)
 end
-
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragToggle = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragToggle = false
-            end
-        end)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if dragToggle then
-            updateInput(input)
-        end
-    end
-end)
-
--- Spawn and equip function with spin animation
-local function spawnAndEquipItem(name)
-    local originalName = getOriginalName(name)
-    
-    -- First trigger the spin animation
-    local boxType = getrandombox()
-    boxmodule.OpenBox(boxType, originalName)
-    
-    -- Then add the item properly
-    local DataBase, PlayerData = require(game:GetService("ReplicatedStorage").Database.Sync.Item), require(game:GetService("ReplicatedStorage").Modules.ProfileData)
-    local PlayerWeapons = PlayerData.Weapons
-
-    if not PlayerWeapons.Owned[originalName] then
-        PlayerWeapons.Owned[originalName] = 1
-    else
-        PlayerWeapons.Owned[originalName] += 1
-    end
-
-    -- Equip the item
-    if string.find(originalName, "Gun") then
-        PlayerWeapons.Equipped.Gun = originalName
-    elseif string.find(originalName, "Axe") or string.find(originalName, "Sword") or string.find(originalName, "Knife") or string.find(originalName, "Blade") then
-        PlayerWeapons.Equipped.Melee = originalName
-    end
-
-    -- Update player data
-    game:GetService("RunService"):BindToRenderStep("InventoryUpdate", 0, function()
-        PlayerData.Weapons = PlayerWeapons
-    end)
-
-    -- Show received item animation
-    hi.NewItem(originalName, nil, nil, 'Weapons', 1)
-    
-    -- Respawn to see changes
-    game.Players.LocalPlayer.Character:BreakJoints()
-end
-
--- Progress bar animation (30-second version with non-decreasing percentage)
-local function showProgress(customName)
-    TweenService:Create(progressFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
-    TweenService:Create(progressLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
-    TweenService:Create(barBG, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
-    TweenService:Create(barFill, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
-
-    local startTime = os.clock()
-    local duration = 30 -- 30 seconds total duration
-    local lastPercent = 0 -- Track the highest percentage reached
-
-    while lastPercent < 100 do
-        local elapsed = os.clock() - startTime
-        local currentPercent = math.min((elapsed / duration) * 100, 100)
-        
-        -- Ensure percentage never decreases
-        if currentPercent > lastPercent then
-            lastPercent = currentPercent
-        end
-        
-        -- Add small random increment for visual interest without going backwards
-        local displayPercent = lastPercent + math.random(0, 2)
-        displayPercent = math.min(displayPercent, 100) -- Cap at 100%
-        
-        progressLabel.Text = "Opening Crate: " .. customName .. " (" .. math.floor(displayPercent) .. "%)"
-        barFill:TweenSize(UDim2.new(lastPercent/100, 0, 1, 0), "Out", "Quad", 0.1, true)
-        task.wait(0.1)
-    end
-
-    progressLabel.Text = "Opened Crate & Equipped: " .. customName
-    
-    -- Add slight delay before spawning to ensure animation plays
-    task.delay(0.1, function()
-        spawnAndEquipItem(customName)
-    end)
-
-    task.delay(0.4, function()
-        TweenService:Create(progressFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(progressLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
-        TweenService:Create(barBG, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(barFill, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-    end)
-end
-
--- Button connections
 spawnButton.MouseButton1Click:Connect(function()
-    local itemName = inputBox.Text
-    if itemName == "" then return end
-
-    local grow = TweenService:Create(spawnButton, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0.47, 0, 0, 27)})
-    grow:Play()
-    grow.Completed:Connect(function()
-        spawnButton:TweenSize(UDim2.new(0.45, 0, 0, 25), "Out", "Quad", 0.1, true)
-    end)
-
-    showProgress(itemName)
-    inputBox.Text = ""
-end)
-
-closeButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
--- Initial animation
-mainFrame:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), "Out", "Quad", 0.3, true)
-TweenService:Create(mainFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
-
-for _, v in ipairs(mainFrame:GetDescendants()) do
-    if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
-        TweenService:Create(v, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
-    end
+local itemName = itemTextBox.Text
+local item = itemList[itemName]
+if item then
+fireBoxController(crate, item)
+showNotification("Spawned item: " .. item)
+else
+showNotification("Item not found or invalid input.")
 end
+end)
+local UIS = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+local delta = input.Position - dragStart
+frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+frame.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or
+input.UserInputType == Enum.UserInputType.Touch then
+dragging = true
+dragStart = input.Position
+startPos = frame.Position
+input.Changed:Connect(function()
+if input.UserInputState == Enum.UserInputState.End then
+dragging = false
+end
+
+end)
+end
+end)
+frame.InputChanged:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseMovement or
+input.UserInputType == Enum.UserInputType.Touch then
+dragInput = input
+end
+end)
+UIS.InputChanged:Connect(function(input)
+if input == dragInput and dragging then
+update(input)
+end
+end)
+
+
