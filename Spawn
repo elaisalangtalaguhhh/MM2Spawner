@@ -52,7 +52,7 @@ screenGui.DisplayOrder = 1000
 
 -- Main GUI
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 180)
+mainFrame.Size = UDim2.new(0, 240, 0, 210)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -105,6 +105,34 @@ spawnButton.ZIndex = 2
 spawnButton.Parent = mainFrame
 Instance.new("UICorner", spawnButton).CornerRadius = UDim.new(0, 6)
 
+-- Equip Button (equips without respawn)
+local equipButton = Instance.new("TextButton")
+equipButton.Text = "Equip"
+equipButton.Size = UDim2.new(0.45, 0, 0, 20)
+equipButton.Position = UDim2.new(0.05, 0, 0, 92)
+equipButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+equipButton.TextColor3 = Color3.new(1, 1, 1)
+equipButton.Font = Enum.Font.GothamBlack
+equipButton.TextSize = 11
+equipButton.TextTransparency = 1
+equipButton.ZIndex = 2
+equipButton.Parent = mainFrame
+Instance.new("UICorner", equipButton).CornerRadius = UDim.new(0, 6)
+
+-- Unequip Button (resets slot to default, no respawn needed)
+local unequipButton = Instance.new("TextButton")
+unequipButton.Text = "Unequip"
+unequipButton.Size = UDim2.new(0.45, 0, 0, 20)
+unequipButton.Position = UDim2.new(0.5, 0, 0, 92)
+unequipButton.BackgroundColor3 = Color3.fromRGB(200, 120, 0)
+unequipButton.TextColor3 = Color3.new(1, 1, 1)
+unequipButton.Font = Enum.Font.GothamBlack
+unequipButton.TextSize = 11
+unequipButton.TextTransparency = 1
+unequipButton.ZIndex = 2
+unequipButton.Parent = mainFrame
+Instance.new("UICorner", unequipButton).CornerRadius = UDim.new(0, 6)
+
 -- Open Table Button
 local openButton = Instance.new("TextButton")
 openButton.Text = "Open"
@@ -121,8 +149,8 @@ Instance.new("UICorner", openButton).CornerRadius = UDim.new(0, 6)
 
 -- Scrollable Item Table
 local tableFrame = Instance.new("ScrollingFrame")
-tableFrame.Size = UDim2.new(0.9, 0, 0, 100)
-tableFrame.Position = UDim2.new(0.05, 0, 0, 100)
+tableFrame.Size = UDim2.new(0.9, 0, 0, 80)
+tableFrame.Position = UDim2.new(0.05, 0, 0, 118)
 tableFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 tableFrame.BackgroundTransparency = 1
 tableFrame.BorderSizePixel = 0
@@ -197,7 +225,7 @@ end
 local closeButton = Instance.new("TextButton")
 closeButton.Text = "Close"
 closeButton.Size = UDim2.new(0.35, 0, 0, 20)
-closeButton.Position = UDim2.new(0.6, 0, 0, 145)
+closeButton.Position = UDim2.new(0.6, 0, 0, 175)
 closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeButton.TextColor3 = Color3.new(1, 1, 1)
 closeButton.Font = Enum.Font.GothamBlack
@@ -252,8 +280,8 @@ openButton.MouseButton1Click:Connect(function()
     openButton.Text = isTableOpen and "Close Table" or "Open"
     tableFrame.Visible = isTableOpen
 
-    local mainFrameHeight = isTableOpen and 250 or 180
-    local closeButtonY = isTableOpen and 215 or 145
+    local mainFrameHeight = isTableOpen and 280 or 210
+    local closeButtonY = isTableOpen and 245 or 175
     local progressFrameY = isTableOpen and 170 or 100
 
     TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -387,69 +415,192 @@ local function getWeaponSlot(name)
     return "Knife"
 end
 
--- Spawn and Equip Function
-local function spawnAndEquipItem(name)
-    local ok, DataBase, PlayerData = pcall(function()
+-- Inventory-first system: Spawn ONLY adds to Owned, NEVER touches Equipped.
+-- This forces the normal MM2 flow: open Inventory -> tap item -> game equips it.
+-- Old code did PlayerData.Weapons = PlayerWeapons every frame, which overwrote
+-- manual taps and blocked inventory equipping. We now pin ONLY Owned.
+local SpawnedOwned = {}
+
+local function pinOwnedOnly()
+    local RunService = game:GetService("RunService")
+    pcall(function() RunService:UnbindFromRenderStep("InventoryUpdate") end)
+    RunService:BindToRenderStep("InventoryUpdate", 0, function()
+        local ok, PlayerData = pcall(function()
+            return require(game:GetService("ReplicatedStorage").Modules.ProfileData)
+        end)
+        if not ok or not PlayerData or not PlayerData.Weapons then return end
+        PlayerData.Weapons.Owned = PlayerData.Weapons.Owned or {}
+        -- re-apply every spawned item so server/client wipes don't remove them
+        -- but NEVER touch PlayerData.Weapons.Equipped here, so inventory taps stick
+        for name, count in pairs(SpawnedOwned) do
+            local cur = PlayerData.Weapons.Owned[name]
+            if cur == nil then
+                PlayerData.Weapons.Owned[name] = count
+            elseif typeof(cur) == "number" and typeof(count) == "number" then
+                if cur < count then
+                    PlayerData.Weapons.Owned[name] = count
+                end
+            end
+        end
+    end)
+end
+
+local function tryRefreshInventoryUI()
+    -- Best-effort: MM2 builds inventory UI from ProfileData, try common refresh paths.
+    -- All wrapped in pcall so nothing breaks if the game updated.
+    pcall(function()
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        -- 1) Common inventory refresh remotes/functions
+        for _, v in ipairs(ReplicatedStorage:GetDescendants()) do
+            if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") or v:IsA("BindableEvent") then
+                local n = string.lower(v.Name)
+                if string.find(n, "refreshinventory") or string.find(n, "updateinventory") or string.find(n, "inventoryrefresh") then
+                    if v:IsA("RemoteEvent") or v:IsA("BindableEvent") then pcall(function() v:Fire() end)
+                    elseif v:IsA("RemoteFunction") then pcall(function() v:InvokeServer() end) end
+                end
+            end
+        end
+    end)
+    pcall(function()
+        -- 2) Try calling Inventory module refresh if it exists
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local inv = ReplicatedStorage:FindFirstChild("Modules")
+        if inv then
+            local ok, mod = pcall(function() return require(ReplicatedStorage.Modules:FindFirstChild("Inventory")) end)
+            if ok and mod and type(mod) == "table" then
+                if type(mod.Refresh) == "function" then pcall(mod.Refresh)
+                elseif type(mod.Update) == "function" then pcall(mod.Update)
+                elseif type(mod.Reload) == "function" then pcall(mod.Reload) end
+            end
+        end
+    end)
+    pcall(function()
+        -- 3) Toggle inventory GUI off/on to force rebuild (MM2 MainGUI / InventoryGUI)
+        local pg = game.Players.LocalPlayer:WaitForChild("PlayerGui", 2)
+        if pg then
+            for _, guiName in ipairs({"MainGUI", "InventoryGUI", "Inventory", "Menu"}) do
+                local g = pg:FindFirstChild(guiName)
+                if g then
+                    local inv = g:FindFirstChild("Inventory", true) or g:FindFirstChild("Container", true)
+                    if inv and inv:IsA("GuiObject") then
+                        local was = inv.Visible
+                        inv.Visible = not was
+                        task.wait()
+                        inv.Visible = was
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function getPlayerWeapons()
+    local ok, _, PlayerData = pcall(function()
         return require(game:GetService("ReplicatedStorage").Database.Sync.Item), require(game:GetService("ReplicatedStorage").Modules.ProfileData)
     end)
-    if not ok or not PlayerData then return end
+    if not ok or not PlayerData then return nil, nil end
     local PlayerWeapons = PlayerData.Weapons
-    if not PlayerWeapons then return end
+    if not PlayerWeapons then return nil, nil end
     PlayerWeapons.Owned = PlayerWeapons.Owned or {}
     PlayerWeapons.Equipped = PlayerWeapons.Equipped or {}
+    return PlayerData, PlayerWeapons
+end
 
-    -- Spawn the item
+-- Manual helpers (optional shortcuts). Spawn itself does NOT call these,
+-- so normal flow is: Spawn -> open Inventory -> tap item to equip.
+local function equipOnly(name)
+    local PlayerData, PlayerWeapons = getPlayerWeapons()
+    if not PlayerData then return false end
     if not PlayerWeapons.Owned[name] then
         PlayerWeapons.Owned[name] = 1
-    elseif typeof(PlayerWeapons.Owned[name]) == "number" then
-        PlayerWeapons.Owned[name] += 1
+        SpawnedOwned[name] = 1
     end
-
-    -- Equip the item in the correct slot
     local slot = getWeaponSlot(name)
     if slot == "Gun" then
         PlayerWeapons.Equipped.Gun = name
     else
-        -- MM2 has used both "Knife" and "Melee" across updates, set both to be safe
         PlayerWeapons.Equipped.Knife = name
         PlayerWeapons.Equipped.Melee = name
     end
-
-    -- Update player data (unbind first so re-spawning doesn't error)
-    local RunService = game:GetService("RunService")
-    pcall(function() RunService:UnbindFromRenderStep("InventoryUpdate") end)
-    RunService:BindToRenderStep("InventoryUpdate", 0, function()
-        PlayerData.Weapons = PlayerWeapons
-    end)
-
-    -- Respawn to see changes
-    local char = game.Players.LocalPlayer and game.Players.LocalPlayer.Character
-    if char then
-        pcall(function() char:BreakJoints() end)
-    end
+    pinOwnedOnly()
+    tryRefreshInventoryUI()
+    return true
 end
 
--- Progress Bar Animation
-local function showProgress(customName)
-    local originalName = getOriginalName(customName) -- Convert custom name to original for spawning
+local function unequipOnly(name)
+    local PlayerData, PlayerWeapons = getPlayerWeapons()
+    if not PlayerData then return false end
+    local slot = getWeaponSlot(name)
+    -- Reset to MM2 defaults (Knife / Gun). Don't delete Owned so it stays in inventory.
+    if slot == "Gun" then
+        PlayerWeapons.Equipped.Gun = "Gun"
+    else
+        PlayerWeapons.Equipped.Knife = "Knife"
+        PlayerWeapons.Equipped.Melee = "Knife"
+    end
+    pinOwnedOnly()
+    tryRefreshInventoryUI()
+    return true
+end
+
+-- Spawn to INVENTORY ONLY. Does NOT equip, does NOT respawn.
+-- Player MUST open inventory and tap the item to equip (normal MM2 behavior).
+local function spawnToInventory(name)
+    local PlayerData, PlayerWeapons = getPlayerWeapons()
+    if not PlayerData then return end
+
+    if not PlayerWeapons.Owned[name] then
+        PlayerWeapons.Owned[name] = 1
+        SpawnedOwned[name] = 1
+    elseif typeof(PlayerWeapons.Owned[name]) == "number" then
+        PlayerWeapons.Owned[name] += 1
+        SpawnedOwned[name] = PlayerWeapons.Owned[name]
+    else
+        SpawnedOwned[name] = SpawnedOwned[name] or 1
+    end
+
+    -- DO NOT touch Equipped here on purpose.
+    pinOwnedOnly()
+    tryRefreshInventoryUI()
+    -- NO BreakJoints: killing the player closes inventory and isn't needed for tap-to-equip.
+end
+
+-- Kept for backwards compat: old Spawn+Equip button now just spawns to inventory.
+local function spawnAndEquipItem(name, doRespawn)
+    spawnToInventory(name)
+end
+
+-- Progress Bar Animation (mode: "spawn" | "equip" | "unequip")
+local function showProgress(customName, mode)
+    mode = mode or "spawn"
+    local originalName = getOriginalName(customName)
     TweenService:Create(progressFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
     TweenService:Create(progressLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
     TweenService:Create(barBG, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
     TweenService:Create(barFill, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
 
+    local verb = mode == "equip" and "Equipping: " or mode == "unequip" and "Unequipping: " or "Spawning: "
     local percent = 0
     while percent < 100 do
-        percent += math.random(5, 15)
+        percent += math.random(10, 25)
         percent = math.clamp(percent, 0, 100)
-        progressLabel.Text = "Spawning: " .. customName .. " (" .. percent .. "%)" -- Show custom name in progress
+        progressLabel.Text = verb .. customName .. " (" .. percent .. "%)"
         barFill:TweenSize(UDim2.new(percent / 100, 0, 1, 0), "Out", "Quad", 0.1, true)
-        task.wait(0.5)
+        task.wait(0.2)
     end
 
-    progressLabel.Text = "Spawned & Equipped: " .. customName -- Show custom name when done
-    spawnAndEquipItem(originalName) -- Spawn and equip using original name
+    if mode == "equip" then
+        progressLabel.Text = "Equipped: " .. customName .. " (or tap in Inventory)"
+        equipOnly(originalName)
+    elseif mode == "unequip" then
+        progressLabel.Text = "Unequipped: " .. customName
+        unequipOnly(originalName)
+    else
+        progressLabel.Text = "In Inventory: open it & tap " .. customName
+        spawnToInventory(originalName)
+    end
 
-    task.delay(0.4, function()
+    task.delay(0.6, function()
         TweenService:Create(progressFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
         TweenService:Create(progressLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
         TweenService:Create(barBG, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
@@ -468,7 +619,21 @@ spawnButton.MouseButton1Click:Connect(function()
         spawnButton:TweenSize(UDim2.new(0.45, 0, 0, 25), "Out", "Quad", 0.1, true)
     end)
 
-    showProgress(itemName) -- Pass custom name to progress
+    showProgress(itemName, "spawn")
+    inputBox.Text = ""
+end)
+
+equipButton.MouseButton1Click:Connect(function()
+    local itemName = inputBox.Text
+    if itemName == "" then return end
+    showProgress(itemName, "equip")
+    inputBox.Text = ""
+end)
+
+unequipButton.MouseButton1Click:Connect(function()
+    local itemName = inputBox.Text
+    if itemName == "" then return end
+    showProgress(itemName, "unequip")
     inputBox.Text = ""
 end)
 
