@@ -7,7 +7,7 @@ local items = {
     {original = "Harvester", custom = "Harvester"},
     {original = "Gingerscope", custom = "Gingerscope"},
     {original = "Bauble", custom = "Bauble"},
-    {original = "Icepiercer", custom = " Icepiercer"},
+    {original = "Icepiercer", custom = "Icepiercer"},
     {original = "TreeGun2023", custom = "Evergun"},
     {original = "TreeKnife2023", custom = "Evergreen"},
     {original = "TreeGun2023Chroma", custom = "Chroma Evergun"},
@@ -27,7 +27,7 @@ local items = {
     {original = "Darksword", custom = "Darksword"},
     {original = "Darkshot", custom = "Darkshot"},
     {original = "VampireAxe", custom = "Vampire Axe"},
-    {original = "VampireGun", custom = "VampirecGun"},
+    {original = "VampireGun", custom = "Vampire Gun"},
     {original = "SwirlyAxe", custom = "Swirly Axe"},
     {original = "SwirlyGun", custom = "Swirly Gun"},
     {original = "Flowerwood", custom = "Flowerwood"},
@@ -302,32 +302,131 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+-- Known weapon slot for each original name (fallback if Database lookup fails)
+-- MM2 uses "Gun" for guns and "Knife"/"Melee" for everything else
+local itemTypes = {
+    Harvester = "Knife",
+    Gingerscope = "Knife",
+    Bauble = "Knife",
+    Icepiercer = "Knife",
+    TreeGun2023 = "Gun",
+    TreeKnife2023 = "Knife",
+    TreeGun2023Chroma = "Gun",
+    TreeKnife2023Chroma = "Knife",
+    Bloom = "Knife",
+    Flora = "Gun",
+    TravelerAxe = "Knife",
+    TravelerGun = "Gun",
+    TravelerAxeChroma = "Knife",
+    TravelerGunChroma = "Gun",
+    Celestial = "Knife",
+    Constellation = "Gun",
+    ConstellationChroma = "Gun",
+    BaubleChroma = "Knife",
+    Candy = "Knife",
+    Sugar = "Knife",
+    Darksword = "Knife",
+    Darkshot = "Gun",
+    VampireAxe = "Knife",
+    VampireGun = "Gun",
+    SwirlyAxe = "Knife",
+    SwirlyGun = "Gun",
+    Flowerwood = "Knife",
+    FlowerwoodGun = "Gun",
+    VampireGunChroma = "Gun",
+    WatergunChroma = "Gun",
+    Turkey2023 = "Knife",
+    Sakura_K = "Knife",
+    Blossom_G = "Gun",
+    ZombieBat = "Knife",
+    Makeshift = "Knife",
+    Sorry = "Knife",
+}
+
+local function getWeaponSlot(name)
+    -- 1) Most reliable: ask the game's own Database
+    local ok, DataBase = pcall(function()
+        return require(game:GetService("ReplicatedStorage").Database.Sync.Item)
+    end)
+    if ok and DataBase and DataBase[name] then
+        local ok2, slot = pcall(function()
+            local info = DataBase[name]
+            if type(info) == "table" then
+                -- try common field names used by MM2
+                local t = info.ItemType or info.Type or info.Category or info.Kind or info.WeaponType or info.Weapon or info.Slot
+                if t then return tostring(t) end
+                -- some DBs store booleans like {Gun = true} / {Knife = true}
+                if info.Gun then return "Gun" end
+                if info.Knife or info.Melee or info.Blade then return "Knife" end
+            elseif type(info) == "string" then
+                return info
+            end
+            return nil
+        end)
+        if ok2 and slot then
+            local s = string.lower(slot)
+            if string.find(s, "gun") then return "Gun" end
+            if string.find(s, "knife") or string.find(s, "melee") or string.find(s, "blade")
+                or string.find(s, "axe") or string.find(s, "sword") or string.find(s, "scythe")
+                or string.find(s, "bat") then
+                return "Knife"
+            end
+        end
+    end
+
+    -- 2) Explicit fallback map above
+    if itemTypes[name] then
+        return itemTypes[name]
+    end
+
+    -- 3) Heuristic fallback (old logic was case-sensitive and missed _G/_K, Darkshot, Flora, etc.)
+    local lower = string.lower(name)
+    if string.find(lower, "gun") or string.find(name, "_G") then
+        return "Gun"
+    end
+    return "Knife"
+end
+
 -- Spawn and Equip Function
 local function spawnAndEquipItem(name)
-    local DataBase, PlayerData = require(game:GetService("ReplicatedStorage").Database.Sync.Item), require(game:GetService("ReplicatedStorage").Modules.ProfileData)
+    local ok, DataBase, PlayerData = pcall(function()
+        return require(game:GetService("ReplicatedStorage").Database.Sync.Item), require(game:GetService("ReplicatedStorage").Modules.ProfileData)
+    end)
+    if not ok or not PlayerData then return end
     local PlayerWeapons = PlayerData.Weapons
+    if not PlayerWeapons then return end
+    PlayerWeapons.Owned = PlayerWeapons.Owned or {}
+    PlayerWeapons.Equipped = PlayerWeapons.Equipped or {}
 
     -- Spawn the item
     if not PlayerWeapons.Owned[name] then
         PlayerWeapons.Owned[name] = 1
-    else
+    elseif typeof(PlayerWeapons.Owned[name]) == "number" then
         PlayerWeapons.Owned[name] += 1
     end
 
-    -- Equip the item
-    if string.find(name, "Gun") then
+    -- Equip the item in the correct slot
+    local slot = getWeaponSlot(name)
+    if slot == "Gun" then
         PlayerWeapons.Equipped.Gun = name
-    elseif string.find(name, "Axe") or string.find(name, "Sword") or string.find(name, "Knife") or string.find(name, "Blade") then
+    else
+        -- MM2 has used both "Knife" and "Melee" across updates, set both to be safe
+        PlayerWeapons.Equipped.Knife = name
         PlayerWeapons.Equipped.Melee = name
     end
 
-    -- Update player data
-    game:GetService("RunService"):BindToRenderStep("InventoryUpdate", 0, function()
+    -- Update player data (unbind first so re-spawning doesn't error)
+    local RunService = game:GetService("RunService")
+    pcall(function() RunService:UnbindFromRenderStep("InventoryUpdate") end)
+    RunService:BindToRenderStep("InventoryUpdate", 0, function()
         PlayerData.Weapons = PlayerWeapons
     end)
 
     -- Respawn to see changes
-    game.Players.LocalPlayer.Character:BreakJoints()
+    local char = game.Players.LocalPlayer and game.Players.LocalPlayer.Character
+    if char then
+        pcall(function() char:BreakJoints() end)
+    end
 end
 
 -- Progress Bar Animation
