@@ -74,29 +74,41 @@ local function getHipJoint(refPart, char)
         if not _G.GingerOrig[j] then _G.GingerOrig[j] = j.C0 end
         return j
     end
-    if char then
-        for _, d in ipairs(char:GetDescendants()) do
-            if d:IsA("Motor6D") or d:IsA("Weld") then
-                if d.Part0 == refPart or d.Part1 == refPart then
-                    if not _G.GingerOrig[d] then _G.GingerOrig[d] = d.C0 end
-                    return d
+    local scopes = {}
+    if char then table.insert(scopes, char) end
+    if refPart.Parent then table.insert(scopes, refPart.Parent) end
+    table.insert(scopes, game.Workspace)
+    for _, scope in ipairs(scopes) do
+        local ok, desc = pcall(function() return scope:GetDescendants() end)
+        if ok and desc then
+            for _, d in ipairs(desc) do
+                if d:IsA("Motor6D") or d:IsA("Weld") then
+                    if d.Part0 == refPart or d.Part1 == refPart then
+                        if not _G.GingerOrig[d] then _G.GingerOrig[d] = d.C0 end
+                        return d
+                    end
                 end
             end
         end
-        for _, d in ipairs(char:GetDescendants()) do
-            if d:IsA("WeldConstraint") and (d.Part0 == refPart or d.Part1 == refPart) then
-                local other = (d.Part0 == refPart) and d.Part1 or d.Part0
-                if other then
-                    d.Enabled = false
-                    _G.GingerWC[refPart] = d
-                    local m = Instance.new("Motor6D")
-                    m.Name = "GingerHipMotor"
-                    m.Part0 = other
-                    m.Part1 = refPart
-                    m.C0 = other.CFrame:ToObjectSpace(refPart.CFrame)
-                    m.Parent = refPart
-                    _G.GingerOrig[m] = m.C0
-                    return m
+    end
+    for _, scope in ipairs(scopes) do
+        local ok, desc = pcall(function() return scope:GetDescendants() end)
+        if ok and desc then
+            for _, d in ipairs(desc) do
+                if d:IsA("WeldConstraint") and (d.Part0 == refPart or d.Part1 == refPart) then
+                    local other = (d.Part0 == refPart) and d.Part1 or d.Part0
+                    if other then
+                        d.Enabled = false
+                        _G.GingerWC[refPart] = d
+                        local m = Instance.new("Motor6D")
+                        m.Name = "GingerHipMotor"
+                        m.Part0 = other
+                        m.Part1 = refPart
+                        m.C0 = other.CFrame:ToObjectSpace(refPart.CFrame)
+                        m.Parent = refPart
+                        _G.GingerOrig[m] = m.C0
+                        return m
+                    end
                 end
             end
         end
@@ -113,12 +125,15 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     if isGinger then
         -- Hip only: rotate to match pic 2 horizontal. Hand untouched.
         -- Mesh below still applies so it appears even without owning.
-        if isDisplay and char then
+        if isDisplay then
             local joint = getHipJoint(refPart, char)
             if joint then
                 joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
             else
-                print("[Ginger] NO JOINT found for", refPart:GetFullName())
+                -- Workspace preview has no joint: rotate part itself around stored base
+                if not _G.GingerCF then _G.GingerCF = {} end
+                if not _G.GingerCF[refPart] then _G.GingerCF[refPart] = refPart.CFrame end
+                refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
             end
         end
     else
