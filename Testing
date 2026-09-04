@@ -1,549 +1,129 @@
-if not isfile("mm2data.lua") then
-    local result = request({
-        Url = "https://raw.githubusercontent.com/Lutosys/opensrc/refs/heads/main/mm2meshes.lua",
-        Method = "GET",
-    })
+--// Gingerscope Rotation Editor
 
-    if result.Success then
-        writefile("mm2data.lua", result.Body)
-    end
-end
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
-data = loadfile("mm2data.lua")() or nil
+local gui = Instance.new("ScreenGui")
+gui.Name = "GingerscopeRotationEditor"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
-if not data then
-    return warn("failed to load data")
-end
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(260, 210)
+frame.Position = UDim2.new(0, 20, 0.5, -105)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+frame.Parent = gui
 
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = frame
 
-local function findMeshAndTexture(node)
-    if not node or type(node) ~= "table" then
-        return nil
-    end
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "Gingerscope Rotation"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 18
+title.Font = Enum.Font.SourceSansBold
+title.Parent = frame
 
-    local props = node.Props
+local values = {
+    X = 180,
+    Y = 0,
+    Z = 0
+}
 
-    if props then
-        local meshId = props.MeshId or props.MeshID
+local boxes = {}
 
-        if meshId and meshId ~= "" then
-            local textureId = props.TextureId or props.TextureID or ""
-            local scale = props.Scale or Vector3.new(0.045, 0.045, 0.045)
-            local size = props.Size or Vector3.new(0.045, 0.045, 0.045)
+local function createBox(axis, y)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromOffset(35, 30)
+    label.Position = UDim2.fromOffset(15, y)
+    label.BackgroundTransparency = 1
+    label.Text = axis
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextSize = 16
+    label.Parent = frame
 
-            return {
-                meshid = meshId,
-                textureid = textureId,
-                scale = scale,
-                size = size
-            }
-        end
-    end
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.fromOffset(180, 30)
+    box.Position = UDim2.fromOffset(50, y)
+    box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    box.TextColor3 = Color3.new(1, 1, 1)
+    box.TextSize = 16
+    box.Text = tostring(values[axis])
+    box.ClearTextOnFocus = false
+    box.Parent = frame
 
-    if node.Display and type(node.Display) == "table" then
-        for _, child in ipairs(node.Display) do
-            local res = findMeshAndTexture(child)
+    boxes[axis] = box
 
-            if res then
-                return res
-            end
-        end
-    end
+    box.FocusLost:Connect(function()
+        local number = tonumber(box.Text)
 
-    return nil
-end
-
-
-local function getWeaponData(name)
-    local weaponData = data[name]
-
-    if not weaponData then
-        return nil
-    end
-
-    local found = findMeshAndTexture(weaponData)
-
-    if found then
-        return found
-    end
-
-    return nil
-end
-
-
-local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
-    if not weaponData then
-        return
-    end
-
-    if not weaponData.meshid then
-        return
-    end
-
-    local isGingerscope = weaponName == "Gingerscope"
-
-
-    --==================================================
-    -- TOOL GRIP
-    --==================================================
-
-    if weaponData.meshid:find("79401392") then
-
-        if weapontype == "Gun" then
-            local tool = refPart:FindFirstAncestorOfClass("Tool")
-
-            if tool then
-                tool.Grip = CFrame.fromMatrix(
-                    Vector3.new(0, -0.699999988, -0.300000012),
-                    Vector3.new(1, 0, 0),
-                    Vector3.new(0, 0, 1),
-                    Vector3.new(0, -1, 0)
-                )
-            end
-        end
-
-
-    elseif weaponData.meshid:find("6600918074") then
-
-        if weapontype == "Gun" then
-            local tool = refPart:FindFirstAncestorOfClass("Tool")
-
-            if tool then
-                tool.Grip = CFrame.new(
-                    1,
-                    -0.359999988,
-                    0.00000012,
-                    0, 0, 1,
-                    0, 1, 0,
-                    -1, 0, 0
-                )
-            end
-        end
-
-
-    else
-
-        if weapontype == "Gun" then
-            local tool = refPart:FindFirstAncestorOfClass("Tool")
-
-            if tool then
-
-                if isGingerscope then
-
-                    -- GINGERSCOPE
-                    -- 2x larger
-                    -- Rotate 180 degrees on X
-                    -- so the muzzle points downward.
-
-                    tool.Grip =
-                        CFrame.new(
-                            0,
-                            -0.5,
-                            0.7
-                        )
-                        *
-                        CFrame.Angles(
-                            math.rad(90),
-                            0,
-                            0
-                        )
-
-                else
-
-                    -- DEFAULT GUN GRIP
-
-                    tool.Grip = CFrame.fromMatrix(
-                        Vector3.new(0, -0.5, 0.7),
-                        Vector3.new(1, 0, 0),
-                        Vector3.new(0, 1, 0),
-                        Vector3.new(0, 0, 1)
-                    )
-
-                end
-            end
-        end
-    end
-
-
-    --==================================================
-    -- APPLY MESH
-    --==================================================
-
-    if refPart:IsA("MeshPart") then
-
-        local specialMesh = refPart:FindFirstChildOfClass("SpecialMesh")
-
-        if specialMesh then
-            specialMesh:Destroy()
-        end
-
-
-        if isGingerscope then
-
-            -- 2x Gingerscope size
-            refPart.Size = weaponData.size * 2
-
+        if number then
+            values[axis] = number
         else
-
-            refPart.Size = weaponData.size
-
+            box.Text = tostring(values[axis])
         end
-
-
-        refPart.MeshId = weaponData.meshid
-        refPart.TextureID = weaponData.textureid
-
-
-    else
-
-        local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
-
-        if not mesh then
-            mesh = Instance.new("SpecialMesh")
-            mesh.Name = "Mesh"
-            mesh.Parent = refPart
-        end
-
-
-        if isGingerscope then
-
-            -- 2x Gingerscope size
-            refPart.Size = weaponData.size * 2
-            mesh.Scale = weaponData.scale * 2
-
-        else
-
-            refPart.Size = weaponData.size
-            mesh.Scale = weaponData.scale
-
-        end
-
-
-        mesh.MeshId = weaponData.meshid
-        mesh.TextureId = weaponData.textureid
-    end
-end
-
-
---==================================================
--- MODULES
---==================================================
-
-local InventoryModule =
-    require(game.ReplicatedStorage.Modules.InventoryModule)
-
-local ProfileData =
-    require(game.ReplicatedStorage.Modules.ProfileData)
-
-local Sync =
-    require(game.ReplicatedStorage.Database.Sync)
-
-
---==================================================
--- ADD WEAPONS TO INVENTORY
---==================================================
-
-for name, itemData in pairs(Sync.Weapons) do
-
-    itemData.SortWithinGroup =
-        itemData.SortWithinGroup or 0
-
-    itemData.SortGroup =
-        itemData.SortGroup or nil
-
-    itemData.Name =
-        itemData.Name or itemData.ItemName or name
-
-    itemData.Rarity =
-        itemData.Rarity or "Common"
-
-
-    if Sync.Rarities[itemData.Rarity] then
-
-        local weaponMeshInfo =
-            getWeaponData(name)
-
-        if weaponMeshInfo
-            and weaponMeshInfo.meshid
-            and weaponMeshInfo.textureid
-            and weaponMeshInfo.scale
-            and weaponMeshInfo.size then
-
-            ProfileData.Weapons.Owned[name] = 1
-        end
-    end
-end
-
-
---==================================================
--- UPDATE INVENTORY
---==================================================
-
-local UpdateInventory =
-    filtergc(
-        "table",
-        {
-            Keys = {"UpdateInventory"}
-        },
-        true
-    ).UpdateInventory
-
-
-for key, func in pairs(getgc()) do
-
-    if typeof(func) == "function"
-        and islclosure(func)
-        and debug.info(func, "l") == 122
-        and #debug.getupvalues(func) == 2 then
-
-        UpdateInventory(
-            debug.getupvalue(func, 2),
-            InventoryModule.MyInventory
-        )
-    end
-end
-
-
---==================================================
--- CHECK IF MURDERER
---==================================================
-
-local function isMurder()
-
-    local success, result = pcall(function()
-
-        for _, v in pairs(
-            game.Players.LocalPlayer.Character:GetChildren()
-        ) do
-
-            if typeof(v) == "Instance"
-                and v:IsA("Tool")
-                and v:GetAttribute("ItemType") == "Knife" then
-
-                return true
-            end
-        end
-
-
-        for _, v in pairs(
-            game.Players.LocalPlayer.Backpack:GetChildren()
-        ) do
-
-            if typeof(v) == "Instance"
-                and v:IsA("Tool")
-                and v:GetAttribute("ItemType") == "Knife" then
-
-                return true
-            end
-        end
-
-
-        return false
     end)
+end
+
+createBox("X", 45)
+createBox("Y", 85)
+createBox("Z", 125)
+
+local info = Instance.new("TextLabel")
+info.Size = UDim2.new(1, -20, 0, 35)
+info.Position = UDim2.fromOffset(10, 165)
+info.BackgroundTransparency = 1
+info.Text = "Edit X / Y / Z while playing"
+info.TextColor3 = Color3.fromRGB(180, 180, 180)
+info.TextSize = 13
+info.Parent = frame
 
 
-    if success then
-        return result
+--// Find the displayed gun
+local function getDisplayGun()
+    local char = player.Character
+    if not char then
+        return nil
     end
 
-    return false
+    local display = char:FindFirstChild("DisplayRefGun")
+
+    if display and display:IsA("ObjectValue") then
+        return display.Value
+    end
+
+    return nil
 end
 
 
---==================================================
--- STUCK KNIFE
---==================================================
+local target = getDisplayGun()
 
-game.Workspace.ChildAdded:Connect(function(ch)
+if not target then
+    warn("Could not find DisplayRefGun")
+    return
+end
 
-    if ch
-        and ch:IsA("BasePart")
-        and ch.Name == "StuckKnife" then
+-- Save the original CFrame
+local originalCFrame = target.CFrame
 
-        local mesh =
-            ch:WaitForChild("Mesh")
 
-        if mesh then
+--// Continuously apply rotation
+game:GetService("RunService").RenderStepped:Connect(function()
 
-            local equippedKnifeName =
-                ProfileData.Weapons.Equipped.Knife
-
-            local knifedata =
-                getWeaponData(equippedKnifeName)
-
-            if knifedata then
-
-                if isMurder() then
-
-                    mesh.MeshId =
-                        knifedata.meshid
-
-                    mesh.TextureId =
-                        knifedata.textureid
-
-                    mesh.Scale =
-                        knifedata.scale
-                end
-            end
-        end
+    if not target or not target.Parent then
+        return
     end
+
+    local rotation =
+        CFrame.Angles(
+            math.rad(values.X),
+            math.rad(values.Y),
+            math.rad(values.Z)
+        )
+
+    target.CFrame = originalCFrame * rotation
 end)
-
-
---==================================================
--- MAIN LOOP
---==================================================
-
-while wait() do
-
-    local char =
-        game.Players.LocalPlayer.Character
-
-    if char then
-
-        local equippedKnifeName =
-            ProfileData.Weapons.Equipped.Knife
-
-        local equippedGunName =
-            ProfileData.Weapons.Equipped.Gun
-
-
-        --==================================================
-        -- EQUIPPED WEAPONS
-        --==================================================
-
-        for _, tool in pairs(char:GetChildren()) do
-
-            if tool and tool:IsA("Tool") then
-
-                local itemType =
-                    tool:GetAttribute("ItemType")
-
-                local Handle =
-                    tool:FindFirstChild("Handle")
-
-
-                if Handle then
-
-                    if itemType == "Knife"
-                        and equippedKnifeName then
-
-                        local knifedata =
-                            getWeaponData(equippedKnifeName)
-
-                        if knifedata
-                            and knifedata.meshid
-                            and knifedata.textureid
-                            and knifedata.scale
-                            and knifedata.size then
-
-                            applyWeaponMesh(
-                                Handle,
-                                knifedata,
-                                equippedKnifeName,
-                                "Knife"
-                            )
-                        end
-
-
-                    elseif itemType == "Gun"
-                        and equippedGunName then
-
-                        local gundata =
-                            getWeaponData(equippedGunName)
-
-                        if gundata
-                            and gundata.meshid
-                            and gundata.textureid
-                            and gundata.scale
-                            and gundata.size then
-
-                            applyWeaponMesh(
-                                Handle,
-                                gundata,
-                                equippedGunName,
-                                "Gun"
-                            )
-                        end
-                    end
-                end
-            end
-        end
-
-
-        --==================================================
-        -- DISPLAY GUN
-        --==================================================
-
-        local DisplayRefGun =
-            char:FindFirstChild("DisplayRefGun")
-
-        if DisplayRefGun then
-
-            local refVal =
-                DisplayRefGun.Value
-
-            if refVal
-                and typeof(refVal) == "Instance"
-                and equippedGunName then
-
-                local gundata =
-                    getWeaponData(equippedGunName)
-
-                if gundata
-                    and gundata.meshid
-                    and gundata.textureid
-                    and gundata.scale
-                    and gundata.size then
-
-                    -- IMPORTANT:
-                    -- Pass "Gun" here so the Gingerscope
-                    -- grip adjustment is also applied.
-
-                    applyWeaponMesh(
-                        refVal,
-                        gundata,
-                        equippedGunName,
-                        "Gun"
-                    )
-                end
-            end
-        end
-
-
-        --==================================================
-        -- DISPLAY KNIFE
-        --==================================================
-
-        local DisplayRefKnife =
-            char:FindFirstChild("DisplayRefKnife")
-
-        if DisplayRefKnife then
-
-            local refVal =
-                DisplayRefKnife.Value
-
-            if refVal
-                and typeof(refVal) == "Instance"
-                and equippedKnifeName then
-
-                local knifedata =
-                    getWeaponData(equippedKnifeName)
-
-                if knifedata
-                    and knifedata.meshid
-                    and knifedata.textureid
-                    and knifedata.scale
-                    and knifedata.size then
-
-                    applyWeaponMesh(
-                        refVal,
-                        knifedata,
-                        equippedKnifeName,
-                        "Knife"
-                    )
-                end
-            end
-        end
-    end
-end
