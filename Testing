@@ -1,17 +1,21 @@
--- testing.lua - proper fix on ORIGINAL, NO Scale hack, NO GUI
--- Scale = size only (always positive). Rotation = Grip (held) + C0 (hip).
+-- testing.lua - minimal Ginger-hip fix on ORIGINAL. No joints, no CFrames, no player spin.
+-- Ginger hip: locked flip+shrink once. Held Ginger: same size, default hold. Others: game default.
 
 if not isfile("mm2data.lua") then
     local result = request({
         Url = "https://raw.githubusercontent.com/Lutosys/opensrc/refs/heads/main/mm2meshes.lua",
         Method = "GET",
     })
-    if result.Success then writefile("mm2data.lua", result.Body) end
+    if result.Success then
+        writefile("mm2data.lua", result.Body)
+    end
 end
-data = loadfile("mm2data.lua")() or nil
-if not data then return warn("failed to load data") end
 
--- ORIGINAL loader fixed: was SearchId, file uses MeshId
+data = loadfile("mm2data.lua")() or nil
+if not data then
+    return warn("failed to load data")
+end
+
 local function findMeshAndTexture(node)
     if not node or type(node) ~= "table" then return nil end
     local props = node.Props
@@ -52,256 +56,122 @@ local function findMeshAndTexture(node)
     return nil
 end
 
-local function getWeaponData(name)
-    local wd = data[name]
-    if not wd then return nil end
-    return findMeshAndTexture(wd)
+local function normName(s)
+    s = tostring(s or ""):lower()
+    s = s:gsub("[%s%-%_]+", "")
+    return s
+end
+local DataIndex = {}
+for key, entry in pairs(data) do
+    if type(entry) == "table" then
+        DataIndex[normName(key)] = DataIndex[normName(key)] or key
+        local base = tostring(key):gsub("_G_%d+$", ""):gsub("_K_%d+$", ""):gsub("_%d+$", "")
+        DataIndex[normName(base)] = DataIndex[normName(base)] or key
+        if entry.Meta and entry.Meta.ItemName then
+            DataIndex[normName(entry.Meta.ItemName)] = DataIndex[normName(entry.Meta.ItemName)] or key
+        end
+    end
 end
 
-local GINGER_ID = "15374602183"
-local HIP_RX = 135 -- back from -90 flip
-local HIP_RY = 0 -- 180 spin from 180
-local HIP_RZ = 0
-local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip only, a little smaller than 0.15
-print("[Ginger] v360b SCALE=", GINGER_DISPLAY_SCALE, "RX=", HIP_RX, "RY=", HIP_RY, "RZ=", HIP_RZ)
-getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
-local MY_RUN = getgenv().GingerRunId
-if not _G.GingerOrig then _G.GingerOrig = {} end
-if not _G.GingerWC then _G.GingerWC = {} end
-if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
-if not _G.GingerHipJoint then _G.GingerHipJoint = {} end
-if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
-
-local function getHipJoint(refPart, char)
-    local mine = refPart:FindFirstChild("GingerHipMotor")
-    if mine then return mine end
-    local j = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
-    if j then
-        if not _G.GingerOrig[j] then _G.GingerOrig[j] = j.C0 end
-        return j
-    end
-    local scopes = {}
-    if char then table.insert(scopes, char) end
-    if refPart.Parent then table.insert(scopes, refPart.Parent) end
-    table.insert(scopes, game.Workspace)
-    for _, scope in ipairs(scopes) do
-        local ok, desc = pcall(function() return scope:GetDescendants() end)
-        if ok and desc then
-            for _, d in ipairs(desc) do
-                if d:IsA("Motor6D") or d:IsA("Weld") then
-                    if d.Part0 == refPart or d.Part1 == refPart then
-                        if not _G.GingerOrig[d] then _G.GingerOrig[d] = d.C0 end
-                        return d
-                    end
-                end
-            end
-        end
-    end
-    for _, scope in ipairs(scopes) do
-        local ok, desc = pcall(function() return scope:GetDescendants() end)
-        if ok and desc then
-            for _, d in ipairs(desc) do
-                if d:IsA("WeldConstraint") and (d.Part0 == refPart or d.Part1 == refPart) then
-                    local other = (d.Part0 == refPart) and d.Part1 or d.Part0
-                    if other then
-                        d.Enabled = false
-                        _G.GingerWC[refPart] = d
-                        local m = Instance.new("Motor6D")
-                        m.Name = "GingerHipMotor"
-                        m.Part0 = other
-                        m.Part1 = refPart
-                        m.C0 = other.CFrame:ToObjectSpace(refPart.CFrame)
-                        m.Parent = refPart
-                        _G.GingerOrig[m] = m.C0
-                        return m
-                    end
-                end
-            end
-        end
-    end
+local function getWeaponData(name)
+    if not name then return nil end
+    if data[name] then return findMeshAndTexture(data[name]) end
+    local key = DataIndex[normName(name)]
+    if key and data[key] then return findMeshAndTexture(data[key]) end
     return nil
 end
 
-local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
-    if not weaponData or not weaponData.meshid then return end
-    local isGinger = weaponData.meshid:find(GINGER_ID) ~= nil
-    local isDisplay = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
-    local char = game.Players.LocalPlayer.Character
+local GINGER_ID = "15374602183"
+local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size, others untouched
+getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
+local MY_RUN = getgenv().GingerRunId
+if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
+if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
 
-    if isGinger then
-        -- Locked hip: freeze perfect state. Hand forced default below.
-        if isDisplay and _G.GingerHipLocked[refPart] then return end
-        if not isDisplay and weapontype == "Gun" then
-            -- Held Ginger default Grip (undo any accidental change)
+local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
+    local isDisplay = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
+    if not weaponData or not weaponData.meshid then
+        -- Unknown gun: release stale Ginger hip so other guns appear.
+        if isDisplay and _G.GingerHipLocked[refPart] then
+            local snap = _G.GingerMeshOrig[refPart]
+            if snap then
+                if refPart:IsA("MeshPart") then
+                    if snap.MeshId then refPart.MeshId = snap.MeshId end
+                    if snap.TextureID then refPart.TextureID = snap.TextureID end
+                else
+                    local m0 = refPart:FindFirstChildOfClass("SpecialMesh")
+                    if m0 then
+                        if snap.MeshId then m0.MeshId = snap.MeshId end
+                        if snap.TextureId then m0.TextureId = snap.TextureId end
+                        if snap.Scale then m0.Scale = snap.Scale end
+                    end
+                end
+            end
+            _G.GingerHipLocked[refPart] = nil
+            _G.GingerMeshOrig[refPart] = nil
+        end
+        return
+    end
+    local isGinger = weaponData.meshid:find(GINGER_ID) ~= nil
+
+    if isGinger and isDisplay and _G.GingerHipLocked[refPart] then return end
+
+    -- ORIGINAL Grip logic untouched (hand default).
+    if weaponData.meshid:find("79401392") then
+        if weapontype == "Gun" then
             local tool = refPart:FindFirstAncestorOfClass("Tool")
             if tool then
-                tool.Grip = CFrame.fromMatrix(Vector3.new(0,-0.5,0.7), Vector3.new(1,0,0), Vector3.new(0,1,0), Vector3.new(0,0,1))
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.699999988, -0.300000012),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, 0, 1),
+                    Vector3.new(0, -1, 0)
+                )
             end
         end
-        if isDisplay then
-            local joint = getHipJoint(refPart, char)
-            if joint then
-                -- Only touch if display is Part1 (moves item). If display is Part0, C0 moves player.
-                if joint.Part1 == refPart then
-                    joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
-                    _G.GingerHipJoint[refPart] = joint
-                else
-                    print("[Ginger] SKIP backwards joint to avoid spinning player:", joint:GetFullName(), joint.ClassName)
-                end
-            else
-                -- No joint: check RigidConstraint to player. If free preview, CFrame safe.
-                local tiedToPlayer = false
-                local scopes = {}
-                if char then table.insert(scopes, char) end
-                if refPart.Parent then table.insert(scopes, refPart.Parent) end
-                table.insert(scopes, game.Workspace)
-                for _, scope in ipairs(scopes) do
-                    local ok, desc = pcall(function() return scope:GetDescendants() end)
-                    if ok and desc then
-                        for _, d in ipairs(desc) do
-                            if d:IsA("RigidConstraint") then
-                                -- RigidConstraint uses Attachments, check parents
-                                local p0 = d.Attachment0 and d.Attachment0.Parent
-                                local p1 = d.Attachment1 and d.Attachment1.Parent
-                                if p0 == refPart or p1 == refPart then
-                                    local other = (p0 == refPart) and p1 or p0
-                                    if other and char and other:IsDescendantOf(char) then
-                                        tiedToPlayer = true break
-                                    end
-                                end
-                            elseif d:IsA("WeldConstraint") then
-                                if d.Part0 == refPart or d.Part1 == refPart then
-                                    local other = (d.Part0 == refPart) and d.Part1 or d.Part0
-                                    if other and char and other:IsDescendantOf(char) then
-                                        tiedToPlayer = true break
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    if tiedToPlayer then break end
-                end
-                if tiedToPlayer then
-                    local didAttach = false
-                    for _, a in ipairs(refPart:GetChildren()) do
-                        if a:IsA("Attachment") then
-                            if not _G.GingerOrig[a] then _G.GingerOrig[a] = a.CFrame end
-                            a.CFrame = _G.GingerOrig[a] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
-                            didAttach = true
-                        end
-                    end
-                    if not didAttach then
-                        print("[Ginger] tied to player, left alone:", refPart:GetFullName())
-                    end
-                else
-                    -- free Workspace preview: CFrame cannot spin player
-                    if not _G.GingerCF then _G.GingerCF = {} end
-                    if not _G.GingerCF[refPart] then _G.GingerCF[refPart] = refPart.CFrame end
-                    refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
-                end
+    elseif weaponData.meshid:find("6600918074") then
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.new(1, -0.359999988, 0.00000012, 0, 0, 1, 0, 1, 0, -1, 0, 0)
             end
         end
     else
-        -- Switching away from Ginger: release hip lock, restore joint, show new gun if same-type safe.
-        if isDisplay then
-            local hj = _G.GingerHipJoint[refPart]
-            if hj and _G.GingerOrig[hj] then
-                pcall(function()
-                    if hj.Part1 == refPart then hj.C0 = _G.GingerOrig[hj] end
-                end)
-            end
-            _G.GingerHipJoint[refPart] = nil
-            local mine = refPart:FindFirstChild("GingerHipMotor")
-            if mine then mine:Destroy() end
-            local wc = _G.GingerWC[refPart]
-            if wc then pcall(function() wc.Enabled = true end) _G.GingerWC[refPart] = nil end
-            _G.GingerHipLocked[refPart] = nil
-            local snap = _G.GingerMeshOrig[refPart]
-            _G.GingerMeshOrig[refPart] = nil
-            if _G.GingerCF then _G.GingerCF[refPart] = nil end
-            -- show newly equipped gun/sword, same-type IDs only so never giant.
-            -- cross-type: restore pre-Ginger look so stale Ginger doesn't stick.
-            local targetKind2 = refPart:IsA("MeshPart") and "MeshPart" or "FileMesh"
-            local sourceKind2 = weaponData.kind or "FileMesh"
-            if sourceKind2 == targetKind2 then
-                if targetKind2 == "MeshPart" then
-                    local sm2 = refPart:FindFirstChildOfClass("SpecialMesh")
-                    if sm2 then sm2:Destroy() end
-                    refPart.MeshId = weaponData.meshid
-                    refPart.TextureID = weaponData.textureid
-                else
-                    local m2 = refPart:FindFirstChildOfClass("SpecialMesh")
-                    if m2 then
-                        m2.MeshId = weaponData.meshid
-                        m2.TextureId = weaponData.textureid
-                    end
-                end
-            else
-                if snap then
-                    if targetKind2 == "MeshPart" then
-                        if snap.MeshId then refPart.MeshId = snap.MeshId end
-                        if snap.TextureID then refPart.TextureID = snap.TextureID end
-                    else
-                        local m3 = refPart:FindFirstChildOfClass("SpecialMesh")
-                        if m3 then
-                            if snap.MeshId then m3.MeshId = snap.MeshId end
-                            if snap.TextureId then m3.TextureId = snap.TextureId end
-                            if snap.Scale then m3.Scale = snap.Scale end
-                        end
-                    end
-                end
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.5, 0.7),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, 1, 0),
+                    Vector3.new(0, 0, 1)
+                )
             end
         end
-        return
     end
 
-    -- Mesh swap: Ginger only from here (non-Ginger returned above).
-    local targetKind = refPart:IsA("MeshPart") and "MeshPart" or "FileMesh"
-    local sourceKind = weaponData.kind or "FileMesh"
-    local gingerHip = isGinger and isDisplay
-    local gingerHeld = isGinger and not isDisplay
-    if not gingerHip and not gingerHeld and sourceKind ~= targetKind then
-        return -- non-ginger cross-type: fully default game, no gigantic
-    end
-    if gingerHeld and sourceKind ~= targetKind then
-        -- held Ginger cross-type: same tiny size as hip, positive default orientation
-        if targetKind == "FileMesh" then
-            local meshH = refPart:FindFirstChildOfClass("SpecialMesh")
-            if not meshH then
-                meshH = Instance.new("SpecialMesh")
-                meshH.Name = "Mesh"
-                meshH.Parent = refPart
-            end
-            meshH.MeshId = weaponData.meshid
-            meshH.TextureId = weaponData.textureid
-            meshH.Scale = Vector3.new(GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
-        else
-            local smH = refPart:FindFirstChildOfClass("SpecialMesh")
-            if smH then smH:Destroy() end
-            refPart.Size = weaponData.size * GINGER_DISPLAY_SCALE
-            refPart.MeshId = weaponData.meshid
-            refPart.TextureID = weaponData.textureid
-        end
-        return -- Grip already defaulted above, hand follows arm every frame, no lock
-    end
-    if gingerHeld and sourceKind == targetKind and targetKind == "MeshPart" then
-        -- held Ginger same-type MeshPart: shrink to hip tiny size too
-        local smH2 = refPart:FindFirstChildOfClass("SpecialMesh")
-        if smH2 then smH2:Destroy() end
-        refPart.Size = weaponData.size * GINGER_DISPLAY_SCALE
-        refPart.MeshId = weaponData.meshid
-        refPart.TextureID = weaponData.textureid
-        return
-    end
     if refPart:IsA("MeshPart") then
-        local sm = refPart:FindFirstChildOfClass("SpecialMesh")
-        if sm then sm:Destroy() end
-        if gingerHip and not _G.GingerMeshOrig[refPart] then
+        if isGinger and isDisplay and not _G.GingerMeshOrig[refPart] then
             _G.GingerMeshOrig[refPart] = {MeshId = refPart.MeshId, TextureID = refPart.TextureID}
         end
+        -- Non-ginger MeshPart cross-type guard: only same-type shows, else restore/leave.
+        if not isGinger then
+            if _G.GingerHipLocked[refPart] then
+                local snap = _G.GingerMeshOrig[refPart]
+                if snap then
+                    if snap.MeshId then refPart.MeshId = snap.MeshId end
+                    if snap.TextureID then refPart.TextureID = snap.TextureID end
+                end
+                _G.GingerHipLocked[refPart] = nil
+                _G.GingerMeshOrig[refPart] = nil
+            end
+            if (weaponData.kind or "FileMesh") ~= "MeshPart" then return end
+        end
+        local specialMesh = refPart:FindFirstChildOfClass("SpecialMesh")
+        if specialMesh then specialMesh:Destroy() end
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
-        if gingerHip then _G.GingerHipLocked[refPart] = true end
+        if isGinger and isDisplay then _G.GingerHipLocked[refPart] = true end
     else
         local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
         if not mesh then
@@ -309,64 +179,100 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.Name = "Mesh"
             mesh.Parent = refPart
         end
-        if isGingerLocal and isDisplayLocal and not _G.GingerMeshOrig[refPart] then
-            _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
-        end
-        mesh.MeshId = weaponData.meshid
-        mesh.TextureId = weaponData.textureid
-        local isGingerLocal = weaponData.meshid:find(GINGER_ID) ~= nil
-        local isDisplayLocal = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
-        if isGingerLocal and isDisplayLocal then
-            -- upside down via X-flip, ginger hip only
+        if isGinger and isDisplay then
+            if not _G.GingerMeshOrig[refPart] then
+                _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
+            end
+            -- Proven flip+shrink. No joints, no CFrames: cannot spin player.
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
             mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
-            _G.GingerHipLocked[refPart] = true -- lock rotation+position+size
+            _G.GingerHipLocked[refPart] = true
+        elseif isGinger and not isDisplay then
+            -- Held Ginger: same tiny size as hip, positive default orientation.
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
+            mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
+        else
+            -- Other guns: release stale Ginger, same-type IDs only so never giant.
+            if _G.GingerHipLocked[refPart] then
+                local snap = _G.GingerMeshOrig[refPart]
+                if snap then
+                    if snap.MeshId then mesh.MeshId = snap.MeshId end
+                    if snap.TextureId then mesh.TextureId = snap.TextureId end
+                    if snap.Scale then mesh.Scale = snap.Scale end
+                end
+                _G.GingerHipLocked[refPart] = nil
+                _G.GingerMeshOrig[refPart] = nil
+            end
+            if (weaponData.kind or "FileMesh") ~= "FileMesh" then
+                -- cross-type new MeshPart gun in old Part slot: restore default look instead of giant
+                local snap2 = _G.GingerMeshOrig[refPart]
+                if snap2 then
+                    if snap2.MeshId then mesh.MeshId = snap2.MeshId end
+                    if snap2.TextureId then mesh.TextureId = snap2.TextureId end
+                    if snap2.Scale then mesh.Scale = snap2.Scale end
+                end
+                return
+            end
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
         end
-        -- other weapons Scale untouched
     end
 end
 
 local InventoryModule = require(game.ReplicatedStorage.Modules.InventoryModule)
 local ProfileData = require(game.ReplicatedStorage.Modules.ProfileData)
 local Sync = require(game.ReplicatedStorage.Database.Sync)
+
 for name, itemData in pairs(Sync.Weapons) do
     itemData.SortWithinGroup = itemData.SortWithinGroup or 0
     itemData.SortGroup = itemData.SortGroup or nil
     itemData.Name = itemData.Name or itemData.ItemName or name
     itemData.Rarity = itemData.Rarity or "Common"
     if Sync.Rarities[itemData.Rarity] then
-        local wi = getWeaponData(name)
-        if wi and wi.meshid then ProfileData.Weapons.Owned[name] = 1 end
+        local weaponMeshInfo = getWeaponData(name)
+        if weaponMeshInfo and weaponMeshInfo.meshid and weaponMeshInfo.textureid and weaponMeshInfo.scale and weaponMeshInfo.size then
+            ProfileData.Weapons.Owned[name] = 1
+        end
     end
 end
-local UpdateInventory = filtergc("table", {Keys={"UpdateInventory"}}, true).UpdateInventory
-for _, func in pairs(getgc()) do
-    if typeof(func)=="function" and islclosure(func) and debug.info(func,"l")==122 and #debug.getupvalues(func)==2 then
-        UpdateInventory(debug.getupvalue(func,2), InventoryModule.MyInventory)
+
+local UpdateInventory = filtergc("table", {Keys = {"UpdateInventory"}}, true).UpdateInventory
+for key, func in pairs(getgc()) do
+    if typeof(func) == "function" and islclosure(func) and debug.info(func, "l") == 122 and #debug.getupvalues(func) == 2 then
+        UpdateInventory(debug.getupvalue(func, 2), InventoryModule.MyInventory)
     end
 end
 
 local function isMurder()
-    local ok, res = pcall(function()
+    local success, result = pcall(function()
         for _, v in pairs(game.Players.LocalPlayer.Character:GetChildren()) do
-            if v:IsA("Tool") and v:GetAttribute("ItemType")=="Knife" then return true end
+            if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
+                return true
+            end
         end
         for _, v in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
-            if v:IsA("Tool") and v:GetAttribute("ItemType")=="Knife" then return true end
+            if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
+                return true
+            end
         end
         return false
     end)
-    if ok then return res end
+    if success then return result end
     return false
 end
 
 game.Workspace.ChildAdded:Connect(function(ch)
-    if ch and ch:IsA("BasePart") and ch.Name=="StuckKnife" then
-        local m = ch:WaitForChild("Mesh")
-        if m then
-            local kn = ProfileData.Weapons.Equipped.Knife
-            local kd = kn and getWeaponData(kn)
-            if kd and isMurder() then
-                m.MeshId=kd.meshid m.TextureId=kd.textureid m.Scale=kd.scale
+    if ch and ch:IsA("BasePart") and ch.Name == "StuckKnife" then
+        local mesh = ch:WaitForChild("Mesh")
+        if mesh then
+            local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
+            local knifedata = getWeaponData(equippedKnifeName)
+            if knifedata and isMurder() then
+                mesh.MeshId = knifedata.meshid
+                mesh.TextureId = knifedata.textureid
+                mesh.Scale = knifedata.scale
             end
         end
     end
@@ -376,32 +282,50 @@ while wait() do
     if MY_RUN ~= getgenv().GingerRunId then break end
     local char = game.Players.LocalPlayer.Character
     if char then
-        local kn = ProfileData.Weapons.Equipped.Knife
-        local kg = ProfileData.Weapons.Equipped.Gun
+        local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
+        local equippedGunName = ProfileData.Weapons.Equipped.Gun
         for _, tool in pairs(char:GetChildren()) do
             if tool and tool:IsA("Tool") then
-                local it = tool:GetAttribute("ItemType")
-                local H = tool:FindFirstChild("Handle")
-                if H then
-                    if it=="Knife" and kn then
-                        local kd=getWeaponData(kn)
-                        if kd then applyWeaponMesh(H,kd,kn,"Knife") end
-                    elseif it=="Gun" and kg then
-                        local gd=getWeaponData(kg)
-                        if gd then applyWeaponMesh(H,gd,kg,"Gun") end
+                local itemType = tool:GetAttribute("ItemType")
+                local Handle = tool:FindFirstChild("Handle")
+                if Handle then
+                    if itemType == "Knife" and equippedKnifeName then
+                        local knifedata = getWeaponData(equippedKnifeName)
+                        if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
+                            applyWeaponMesh(Handle, knifedata, equippedKnifeName, "Knife")
+                        end
+                    elseif itemType == "Gun" and equippedGunName then
+                        local gundata = getWeaponData(equippedGunName)
+                        if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
+                            applyWeaponMesh(Handle, gundata, equippedGunName, "Gun")
+                        end
                     end
                 end
             end
         end
-        local rg=char:FindFirstChild("DisplayRefGun")
-        if rg and rg.Value and kg then
-            local gd=getWeaponData(kg)
-            if gd then applyWeaponMesh(rg.Value,gd,kg) end
+        local DisplayRefGun = char:FindFirstChild("DisplayRefGun")
+        if DisplayRefGun then
+            local refVal = DisplayRefGun.Value
+            if refVal and typeof(refVal) == "Instance" and equippedGunName then
+                local gundata = getWeaponData(equippedGunName)
+                if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
+                    applyWeaponMesh(refVal, gundata, equippedGunName)
+                elseif _G.GingerHipLocked[refVal] then
+                    applyWeaponMesh(refVal, nil, equippedGunName)
+                end
+            end
         end
-        local rk=char:FindFirstChild("DisplayRefKnife")
-        if rk and rk.Value and kn then
-            local kd=getWeaponData(kn)
-            if kd then applyWeaponMesh(rk.Value,kd,kn) end
+        local DisplayRefKnife = char:FindFirstChild("DisplayRefKnife")
+        if DisplayRefKnife then
+            local refVal = DisplayRefKnife.Value
+            if refVal and typeof(refVal) == "Instance" and equippedKnifeName then
+                local knifedata = getWeaponData(equippedKnifeName)
+                if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
+                    applyWeaponMesh(refVal, knifedata, equippedKnifeName)
+                elseif _G.GingerHipLocked[refVal] then
+                    applyWeaponMesh(refVal, nil, equippedKnifeName)
+                end
+            end
         end
     end
 end
