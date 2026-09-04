@@ -57,10 +57,11 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local HIP_RX = 90 -- horizontal like pic 2. 360/0 = flat, 90 = horizontal.
-local HIP_RZ = 0 -- no roll, keep flat horizontal
-local GINGER_DISPLAY_SCALE = 0.18 -- tiny to prove change, was 0.25
-print("[Ginger] vZ180 SCALE=", GINGER_DISPLAY_SCALE, "RX=", HIP_RX, "RZ=", HIP_RZ)
+local HIP_RX = 90 -- horizontal
+local HIP_RY = 180 -- another 180 spin for opposite horizontal
+local HIP_RZ = 0
+local GINGER_DISPLAY_SCALE = 0.15 -- a little smaller than 0.18
+print("[Ginger] v360 SCALE=", GINGER_DISPLAY_SCALE, "RX=", HIP_RX, "RY=", HIP_RY, "RZ=", HIP_RZ)
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerOrig then _G.GingerOrig = {} end
@@ -129,7 +130,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             if joint then
                 -- Only touch if display is Part1 (moves item). If display is Part0, C0 moves player.
                 if joint.Part1 == refPart then
-                    joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
+                    joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
                 else
                     print("[Ginger] SKIP backwards joint to avoid spinning player:", joint:GetFullName(), joint.ClassName)
                 end
@@ -140,7 +141,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 for _, a in ipairs(refPart:GetChildren()) do
                     if a:IsA("Attachment") then
                         if not _G.GingerOrig[a] then _G.GingerOrig[a] = a.CFrame end
-                        a.CFrame = _G.GingerOrig[a] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
+                        a.CFrame = _G.GingerOrig[a] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
                         didAttach = true
                     end
                 end
