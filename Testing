@@ -74,6 +74,9 @@ end
 if not _G.GingerOrig then _G.GingerOrig = {} end
 local GINGER_ID = "15374602183"
 local GINGER_SCALE = 0.7 -- lower = smaller, 1.0 = current big, try 0.6-0.8 to match pic 2
+-- kill old loops when re-executing, so size actually updates
+getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
+local MY_RUN = getgenv().GingerRunId
 
 local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     if not weaponData or not weaponData.meshid then return end
@@ -133,8 +136,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
         local sm = refPart:FindFirstChildOfClass("SpecialMesh")
         if sm then sm:Destroy() end
-        -- KEEP SIZE for display so it doesn't get bigger, only change mesh
-        if not isDisplay then
+        -- ginger hip: scale Size too so GINGER_SCALE works for MeshPart
+        if isGinger and isDisplay then
+            refPart.Size = weaponData.size * GINGER_SCALE
+        elseif not isDisplay then
             refPart.Size = weaponData.size
         end
         refPart.MeshId = weaponData.meshid
@@ -223,6 +228,7 @@ game.Workspace.ChildAdded:Connect(function(ch)
 end)
 
 while wait() do
+    if MY_RUN ~= getgenv().GingerRunId then break end
     local char = game.Players.LocalPlayer.Character
     if char then
         local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
