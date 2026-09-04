@@ -22,7 +22,8 @@ local function findMeshAndTexture(node)
                 meshid = meshId,
                 textureid = props.TextureId or props.TextureID or "",
                 scale = props.Scale or Vector3.new(1,1,1),
-                size = props.Size or Vector3.new(0.2697,1.2582,4.2087)
+                size = props.Size or Vector3.new(0.2697,1.2582,4.2087),
+                kind = props.Scale and "FileMesh" or "MeshPart"
             }
         end
     end
@@ -41,7 +42,8 @@ local function findMeshAndTexture(node)
                         meshid = mid,
                         textureid = p.TextureId or p.TextureID or "",
                         scale = p.Scale or Vector3.new(1,1,1),
-                        size = p.Size or partSize or Vector3.new(0.2697,1.2582,4.2087)
+                        size = p.Size or partSize or Vector3.new(0.2697,1.2582,4.2087),
+                        kind = (child.Class == "MeshPart") and "MeshPart" or "FileMesh"
                     }
                 end
             end
@@ -66,6 +68,7 @@ getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerOrig then _G.GingerOrig = {} end
 if not _G.GingerWC then _G.GingerWC = {} end
+if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
 
 local function getHipJoint(refPart, char)
     local mine = refPart:FindFirstChild("GingerHipMotor")
@@ -124,7 +127,15 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     local char = game.Players.LocalPlayer.Character
 
     if isGinger then
-        -- Hip only. Hand untouched. Never move Character.
+        -- Locked hip: freeze perfect state. Hand forced default below.
+        if isDisplay and _G.GingerHipLocked[refPart] then return end
+        if not isDisplay and weapontype == "Gun" then
+            -- Held Ginger default Grip (undo any accidental change)
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.fromMatrix(Vector3.new(0,-0.5,0.7), Vector3.new(1,0,0), Vector3.new(0,1,0), Vector3.new(0,0,1))
+            end
+        end
         if isDisplay then
             local joint = getHipJoint(refPart, char)
             if joint then
@@ -210,12 +221,19 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
     end
 
-    -- Mesh swap: others IDs only. Ginger hip shrunk to fit pistol slot.
+    -- Mesh swap: skip cross-type (MeshPart<->FileMesh) except Ginger hip, so nothing goes gigantic.
+    local targetKind = refPart:IsA("MeshPart") and "MeshPart" or "FileMesh"
+    local sourceKind = weaponData.kind or "FileMesh"
+    local gingerHip = isGinger and isDisplay
+    if not gingerHip and sourceKind ~= targetKind then
+        return -- leave game default size/rotation, no gigantic
+    end
     if refPart:IsA("MeshPart") then
         local sm = refPart:FindFirstChildOfClass("SpecialMesh")
         if sm then sm:Destroy() end
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
+        if gingerHip then _G.GingerHipLocked[refPart] = true end
     else
         local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
         if not mesh then
@@ -228,8 +246,9 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         local isGingerLocal = weaponData.meshid:find(GINGER_ID) ~= nil
         local isDisplayLocal = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
         if isGingerLocal and isDisplayLocal then
-            -- upside down via X-flip
+            -- upside down via X-flip, ginger hip only
             mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
+            _G.GingerHipLocked[refPart] = true -- lock rotation+position+size
         end
         -- other weapons Scale untouched
     end
