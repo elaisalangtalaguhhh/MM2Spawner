@@ -228,8 +228,8 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         local isGingerLocal = weaponData.meshid:find(GINGER_ID) ~= nil
         local isDisplayLocal = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
         if isGingerLocal and isDisplayLocal then
-            -- upside down
-            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
+            -- upside down via X-flip
+            mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
         end
         -- other weapons Scale untouched
     end
