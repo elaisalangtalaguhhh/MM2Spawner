@@ -57,7 +57,8 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local HIP_RX = 225 -- 180 = down, 225 = 45 down past down. Hip only, rotation only, Scale untouched.
+local HIP_RX = 225 -- hip rotation only
+local GINGER_DISPLAY_SCALE = 0.4 -- Ginger hip size only, 1.0 = giant, 0.4 = pic 2. Others untouched.
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerOrig then _G.GingerOrig = {} end
@@ -141,11 +142,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
     end
 
-    -- Mesh swap: Scale/Size = size only, never negative, never rotation
+    -- Mesh swap: others IDs only. Ginger hip shrunk to fit pistol slot.
     if refPart:IsA("MeshPart") then
         local sm = refPart:FindFirstChildOfClass("SpecialMesh")
         if sm then sm:Destroy() end
-        refPart.Size = weaponData.size
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
     else
@@ -155,10 +155,14 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.Name = "Mesh"
             mesh.Parent = refPart
         end
-        refPart.Size = weaponData.size
         mesh.MeshId = weaponData.meshid
         mesh.TextureId = weaponData.textureid
-        mesh.Scale = weaponData.scale
+        local isGingerLocal = weaponData.meshid:find(GINGER_ID) ~= nil
+        local isDisplayLocal = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
+        if isGingerLocal and isDisplayLocal then
+            mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
+        end
+        -- other weapons Scale untouched
     end
 end
 
