@@ -57,8 +57,8 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local HIP_RX = 90 -- horizontal
-local HIP_RY = 180 -- spin around for opposite horizontal
+local HIP_RX = 135 -- +45
+local HIP_RY = 180
 local HIP_RZ = 0
 local GINGER_DISPLAY_SCALE = 0.15
 print("[Ginger] v360b SCALE=", GINGER_DISPLAY_SCALE, "RX=", HIP_RX, "RY=", HIP_RY, "RZ=", HIP_RZ)
