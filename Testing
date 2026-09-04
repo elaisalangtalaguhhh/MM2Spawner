@@ -1,15 +1,20 @@
--- testing.lua - Gingerscope ONLY rotator + size, NO spawner GUI
--- Equip Gingerscope, then use the editor to find the angle. Tell me the numbers for permanent fix.
+-- testing.lua - Gingerscope rotate only, NO GUI
+-- v3: keep hip size same (no bigger), flip via Scale so weld type doesn't matter
 
 if not isfile("mm2data.lua") then
     local result = request({
         Url = "https://raw.githubusercontent.com/Lutosys/opensrc/refs/heads/main/mm2meshes.lua",
         Method = "GET",
     })
-    if result.Success then writefile("mm2data.lua", result.Body) end
+    if result.Success then
+        writefile("mm2data.lua", result.Body)
+    end
 end
+
 data = loadfile("mm2data.lua")() or nil
-if not data then return warn("failed to load data") end
+if not data then
+    return warn("failed to load data")
+end
 
 local function findMeshAndTexture(node)
     if not node or type(node) ~= "table" then return nil end
@@ -17,29 +22,13 @@ local function findMeshAndTexture(node)
     if props then
         local meshId = props.MeshId or props.MeshID or props.SearchId or props.SearchID
         if meshId and meshId ~= "" then
-            return {
-                meshid = meshId,
-                textureid = props.TextureId or props.TextureID or "",
-                scale = props.Scale or Vector3.new(1,1,1),
-                size = props.Size or Vector3.new(0.2697,1.2582,4.2087)
-            }
+            local textureId = props.TextureId or props.TextureID or ""
+            local scale = props.Scale or Vector3.new(1, 1, 1)
+            local size = props.Size or Vector3.new(0.2697, 1.2582, 4.2087)
+            return { meshid = meshId, textureid = textureId, scale = scale, size = size }
         end
     end
     if node.Display and type(node.Display) == "table" then
-        for _, child in ipairs(node.Display) do
-            local p = child.Props
-            if p then
-                local mid = p.MeshId or p.MeshID or p.SearchId or p.SearchID
-                if mid and mid ~= "" then
-                    return {
-                        meshid = mid,
-                        textureid = p.TextureId or p.TextureID or "",
-                        scale = p.Scale or Vector3.new(1,1,1),
-                        size = p.Size or Vector3.new(0.2697,1.2582,4.2087)
-                    }
-                end
-            end
-        end
         local foundSize, foundMesh, foundTex, foundScale
         for _, child in ipairs(node.Display) do
             local p = child.Props
@@ -50,172 +39,106 @@ local function findMeshAndTexture(node)
                 local tid = p.TextureId or p.TextureID
                 if tid ~= nil then foundTex = tid end
                 if p.Scale then foundScale = p.Scale end
+                if mid and mid ~= "" then
+                    return {
+                        meshid = mid,
+                        textureid = tid or foundTex or "",
+                        scale = p.Scale or Vector3.new(1, 1, 1),
+                        size = p.Size or foundSize or Vector3.new(0.2697, 1.2582, 4.2087)
+                    }
+                end
             end
         end
         if foundMesh then
-            return {meshid=foundMesh, textureid=foundTex or "", scale=foundScale or Vector3.new(1,1,1), size=foundSize or Vector3.new(0.045,0.045,0.045)}
+            return {
+                meshid = foundMesh,
+                textureid = foundTex or "",
+                scale = foundScale or Vector3.new(1, 1, 1),
+                size = foundSize or Vector3.new(0.045, 0.045, 0.045)
+            }
+        end
+        for _, child in ipairs(node.Display) do
+            local res = findMeshAndTexture(child)
+            if res then return res end
         end
     end
     return nil
 end
 
 local function getWeaponData(name)
-    local wd = data[name]
-    if not wd then return nil end
-    return findMeshAndTexture(wd)
+    local weaponData = data[name]
+    if not weaponData then return nil end
+    return findMeshAndTexture(weaponData)
 end
 
--- Gingerscope only
-local GINGER_ID = "15374602183"
 if not _G.GingerOrig then _G.GingerOrig = {} end
-if not _G.GingerWC then _G.GingerWC = {} end
-
--- Editable live values (editor changes these)
-if _G.GingerHipRX == nil then _G.GingerHipRX = 180 end
-if _G.GingerHipRY == nil then _G.GingerHipRY = 0 end
-if _G.GingerHipRZ == nil then _G.GingerHipRZ = 0 end
-if _G.GingerHeldRX == nil then _G.GingerHeldRX = 180 end
-if _G.GingerHeldRY == nil then _G.GingerHeldRY = 0 end
-if _G.GingerHeldRZ == nil then _G.GingerHeldRZ = 0 end
-if _G.GingerScale == nil then _G.GingerScale = 0.75 end -- lower = smaller (fixes big)
-
-local function isGingerData(wd)
-    return wd and wd.meshid and wd.meshid:find(GINGER_ID) ~= nil
-end
-
--- Get or create editable Motor6D for hip, replaces WeldConstraint once
-local function getHipJoint(refPart, char)
-    -- already made by us?
-    local mine = refPart:FindFirstChild("GingerHipMotor")
-    if mine and mine:IsA("Motor6D") then return mine end
-    -- existing Motor6D / Weld
-    local j = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
-    if j then
-        if not _G.GingerOrig[j] then _G.GingerOrig[j] = j.C0 end
-        return j
-    end
-    -- search character for joint touching refPart
-    if char then
-        for _, d in ipairs(char:GetDescendants()) do
-            if d:IsA("Motor6D") or d:IsA("Weld") then
-                if d.Part0 == refPart or d.Part1 == refPart then
-                    if not _G.GingerOrig[d] then _G.GingerOrig[d] = d.C0 end
-                    return d
-                end
-            end
-        end
-        -- WeldConstraint fallback: replace with Motor6D so we can rotate freely
-        for _, d in ipairs(char:GetDescendants()) do
-            if d:IsA("WeldConstraint") then
-                if d.Part0 == refPart or d.Part1 == refPart then
-                    local other = (d.Part0 == refPart) and d.Part1 or d.Part0
-                    if other then
-                        d.Enabled = false
-                        _G.GingerWC[refPart] = d
-                        local m = Instance.new("Motor6D")
-                        m.Name = "GingerHipMotor"
-                        m.Part0 = other
-                        m.Part1 = refPart
-                        pcall(function()
-                            m.C0 = other.CFrame:ToObjectSpace(refPart.CFrame)
-                        end)
-                        m.Parent = refPart
-                        _G.GingerOrig[m] = m.C0
-                        print("[Ginger] WeldConstraint replaced with Motor6D")
-                        return m
-                    end
-                end
-            end
-        end
-    end
-    return nil
-end
-
-local function restoreHip(refPart)
-    local mine = refPart:FindFirstChild("GingerHipMotor")
-    if mine then
-        mine:Destroy()
-    end
-    local wc = _G.GingerWC[refPart]
-    if wc then
-        pcall(function() wc.Enabled = true end)
-        _G.GingerWC[refPart] = nil
-    end
-end
+local GINGER_ID = "15374602183"
+local GINGER_SCALE = 0.7 -- lower = smaller, 1.0 = current big, try 0.6-0.8 to match pic 2
 
 local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     if not weaponData or not weaponData.meshid then return end
-    local ginger = isGingerData(weaponData)
-    local char = game.Players.LocalPlayer.Character
+    local isGinger = weaponData.meshid:find(GINGER_ID) ~= nil
     local isDisplay = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
 
-    if ginger then
-        -- HELD
-        if not isDisplay and weapontype == "Gun" then
+    -- HELD gun in hand: Grip only, keep normal size
+    if not isDisplay then
+        if weapontype == "Gun" then
             local tool = refPart:FindFirstAncestorOfClass("Tool")
-            if tool then
-                local rx, ry, rz = math.rad(_G.GingerHeldRX), math.rad(_G.GingerHeldRY), math.rad(_G.GingerHeldRZ)
-                tool.Grip = CFrame.new(Vector3.new(0, -0.5, 0.7)) * CFrame.Angles(rx, ry, rz)
-            end
-        end
-        -- HIP
-        if isDisplay and char then
-            local joint = getHipJoint(refPart, char)
-            if joint then
-                local rx, ry, rz = math.rad(_G.GingerHipRX), math.rad(_G.GingerHipRY), math.rad(_G.GingerHipRZ)
-                joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(rx, ry, rz)
-            end
-        end
-    else
-        -- not ginger: restore hip if we touched it
-        if isDisplay then
-            pcall(function()
-                local j = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
-                if j and _G.GingerOrig[j] then joint = j; j.C0 = _G.GingerOrig[j] end
-            end)
-            restoreHip(refPart)
-        else
-            if weapontype == "Gun" then
-                local tool = refPart:FindFirstAncestorOfClass("Tool")
-                if tool then
-                    if weaponData.meshid:find("79401392") then
-                        tool.Grip = CFrame.fromMatrix(Vector3.new(0,-0.699999988,-0.300000012), Vector3.new(1,0,0), Vector3.new(0,0,1), Vector3.new(0,-1,0))
-                    elseif weaponData.meshid:find("6600918074") then
-                        tool.Grip = CFrame.new(1,-0.359999988,0.00000012,0,0,1,0,1,0,-1,0,0)
-                    else
-                        tool.Grip = CFrame.fromMatrix(Vector3.new(0,-0.5,0.7), Vector3.new(1,0,0), Vector3.new(0,1,0), Vector3.new(0,0,1))
-                    end
-                end
+            if tool and isGinger then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.5, 0.7),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, -1, 0),
+                    Vector3.new(0, 0, -1)
+                )
+            elseif tool and weaponData.meshid:find("79401392") then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.699999988, -0.300000012),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, 0, 1),
+                    Vector3.new(0, -1, 0)
+                )
+            elseif tool and weaponData.meshid:find("6600918074") then
+                tool.Grip = CFrame.new(1, -0.359999988, 0.00000012, 0, 0, 1, 0, 1, 0, -1, 0, 0)
+            elseif tool and weapontype == "Gun" then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.5, 0.7),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, 1, 0),
+                    Vector3.new(0, 0, 1)
+                )
             end
         end
     end
 
-    -- Mesh swap, ginger uses Scale slider so NOT big
+    -- DISPLAY (hip) + HELD mesh swap
     if refPart:IsA("MeshPart") then
+        -- MeshPart can't use negative Scale, try weld C0 flip for display
+        if isGinger and isDisplay then
+            pcall(function()
+                local joint = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
+                if not joint and refPart.Parent then
+                    for _, c in ipairs(refPart.Parent:GetChildren()) do
+                        if (c:IsA("Motor6D") or c:IsA("Weld")) and (c.Part0 == refPart or c.Part1 == refPart) then
+                            joint = c break
+                        end
+                    end
+                end
+                print("[Ginger] MeshPart display joint:", joint and joint.ClassName or "NONE - WeldConstraint?")
+                if joint then
+                    if not _G.GingerOrig[joint] then _G.GingerOrig[joint] = joint.C0 end
+                    joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(180), 0, 0)
+                end
+            end)
+        end
         local sm = refPart:FindFirstChildOfClass("SpecialMesh")
         if sm then sm:Destroy() end
-        if ginger then
-            -- keep original part size, scale visual via Size * scale factor
-            if not isDisplay then
-                refPart.Size = weaponData.size * _G.GingerScale
-            end
-        else
-            if not isDisplay then refPart.Size = weaponData.size end
+        -- KEEP SIZE for display so it doesn't get bigger, only change mesh
+        if not isDisplay then
+            refPart.Size = weaponData.size
         end
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
-        -- MeshPart size scaling for hip to fix big:
-        if ginger and isDisplay then
-            -- shrink/grow around base size without changing part length too much:
-            -- we scale Size but keep it proportional
-            pcall(function()
-                if not _G.GingerHipBaseSize then _G.GingerHipBaseSize = {} end
-                if not _G.GingerHipBaseSize[refPart] then _G.GingerHipBaseSize[refPart] = refPart.Size end
-                refPart.Size = _G.GingerHipBaseSize[refPart] * 1 -- keep part size
-                -- visual scale via MeshId can't scale, so use Size factor:
-                refPart.Size = weaponData.size * _G.GingerScale
-            end)
-        end
     else
         local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
         if not mesh then
@@ -223,16 +146,16 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.Name = "Mesh"
             mesh.Parent = refPart
         end
-        if ginger then
+        if isGinger and isDisplay then
+            -- Flip via negative Scale = 180 X rotation, no weld edit, no size change
+            -- This is what actually rotates muzzle down on hip
+            print("[Ginger] Part display flip via Scale")
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
-            -- positive scale * slider, rotation comes from joint not negative scale
-            local s = _G.GingerScale
-            mesh.Scale = Vector3.new(s, s, s)
-            -- do NOT touch refPart.Size for hip = fixes big
-            if not isDisplay then
-                refPart.Size = weaponData.size
-            end
+            local s = weaponData.scale
+            -- use base scale flipped + GINGER_SCALE shrink, keep part size unchanged
+            mesh.Scale = Vector3.new(s.X * GINGER_SCALE, -math.abs(s.Y) * GINGER_SCALE, -math.abs(s.Z) * GINGER_SCALE)
+            -- DO NOT touch refPart.Size here
         else
             refPart.Size = weaponData.size
             mesh.MeshId = weaponData.meshid
@@ -242,237 +165,106 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     end
 end
 
--- Modules
 local InventoryModule = require(game.ReplicatedStorage.Modules.InventoryModule)
 local ProfileData = require(game.ReplicatedStorage.Modules.ProfileData)
 local Sync = require(game.ReplicatedStorage.Database.Sync)
+
 for name, itemData in pairs(Sync.Weapons) do
     itemData.SortWithinGroup = itemData.SortWithinGroup or 0
+    itemData.SortGroup = itemData.SortGroup or nil
     itemData.Name = itemData.Name or itemData.ItemName or name
     itemData.Rarity = itemData.Rarity or "Common"
     if Sync.Rarities[itemData.Rarity] then
-        local wi = getWeaponData(name)
-        if wi and wi.meshid then ProfileData.Weapons.Owned[name] = 1 end
-    end
-end
-local UpdateInventory = filtergc("table", {Keys={"UpdateInventory"}}, true).UpdateInventory
-for _, func in pairs(getgc()) do
-    if typeof(func)=="function" and islclosure(func) and debug.info(func,"l")==122 and #debug.getupvalues(func)==2 then
-        UpdateInventory(debug.getupvalue(func,2), InventoryModule.MyInventory)
+        local weaponMeshInfo = getWeaponData(name)
+        if weaponMeshInfo and weaponMeshInfo.meshid and weaponMeshInfo.textureid and weaponMeshInfo.scale and weaponMeshInfo.size then
+            ProfileData.Weapons.Owned[name] = 1
+        end
     end
 end
 
--- EDITOR GUI (Gingerscope only)
-local parentGui = gethui and gethui() or game:GetService("CoreGui")
-pcall(function()
-    local o = parentGui:FindFirstChild("GingerEditor")
-    if o then o:Destroy() end
-end)
-local gui = Instance.new("ScreenGui")
-gui.Name = "GingerEditor"
-gui.ResetOnSpawn = false
-gui.Parent = parentGui
-
-local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 300, 0, 430)
-main.Position = UDim2.new(0, 20, 0.5, -215)
-main.BackgroundColor3 = Color3.fromRGB(18,18,24)
-main.BorderSizePixel = 0
-main.Active = true
-main.Draggable = true
-main.Parent = gui
-Instance.new("UICorner", main).CornerRadius = UDim.new(0,8)
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,30)
-title.BackgroundTransparency = 1
-title.Text = "Gingerscope Rotator"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 14
-title.TextColor3 = Color3.white
-title.Parent = main
-
-local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1,-16,0,28)
-status.Position = UDim2.new(0,8,0,30)
-status.BackgroundTransparency = 1
-status.Font = Enum.Font.Gotham
-status.TextSize = 12
-status.TextColor3 = Color3.fromRGB(255,200,100)
-status.TextWrapped = true
-status.Text = "Equip Gingerscope"
-status.Parent = main
-
-local y = 62
-local function addRow(labelText, getFn, setFn)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1,-16,0,18)
-    lbl.Position = UDim2.new(0,8,0,y)
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 12
-    lbl.TextColor3 = Color3.white
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = main
-    y = y + 18
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1,-16,0,28)
-    row.Position = UDim2.new(0,8,0,y)
-    row.BackgroundTransparency = 1
-    row.Parent = main
-
-    local minus10 = Instance.new("TextButton")
-    minus10.Size = UDim2.new(0,36,1,0)
-    minus10.Position = UDim2.new(0,0,0,0)
-    minus10.Text = "-10"
-    minus10.Font = Enum.Font.GothamBold
-    minus10.TextSize = 12
-    minus10.TextColor3 = Color3.white
-    minus10.BackgroundColor3 = Color3.fromRGB(50,50,65)
-    minus10.Parent = row
-    Instance.new("UICorner", minus10).CornerRadius = UDim.new(0,5)
-
-    local minus1 = Instance.new("TextButton")
-    minus1.Size = UDim2.new(0,32,1,0)
-    minus1.Position = UDim2.new(0,40,0,0)
-    minus1.Text = "-1"
-    minus1.Font = Enum.Font.GothamBold
-    minus1.TextSize = 12
-    minus1.TextColor3 = Color3.white
-    minus1.BackgroundColor3 = Color3.fromRGB(50,50,65)
-    minus1.Parent = row
-    Instance.new("UICorner", minus1).CornerRadius = UDim.new(0,5)
-
-    local val = Instance.new("TextLabel")
-    val.Size = UDim2.new(0,90,1,0)
-    val.Position = UDim2.new(0,76,0,0)
-    val.BackgroundColor3 = Color3.fromRGB(30,30,40)
-    val.Font = Enum.Font.GothamBold
-    val.TextSize = 13
-    val.TextColor3 = Color3.fromRGB(140,255,140)
-    val.Parent = row
-    Instance.new("UICorner", val).CornerRadius = UDim.new(0,5)
-
-    local plus1 = Instance.new("TextButton")
-    plus1.Size = UDim2.new(0,32,1,0)
-    plus1.Position = UDim2.new(0,170,0,0)
-    plus1.Text = "+1"
-    plus1.Font = Enum.Font.GothamBold
-    plus1.TextSize = 12
-    plus1.TextColor3 = Color3.white
-    plus1.BackgroundColor3 = Color3.fromRGB(70,130,200)
-    plus1.Parent = row
-    Instance.new("UICorner", plus1).CornerRadius = UDim.new(0,5)
-
-    local plus10 = Instance.new("TextButton")
-    plus10.Size = UDim2.new(0,36,1,0)
-    plus10.Position = UDim2.new(0,206,0,0)
-    plus10.Text = "+10"
-    plus10.Font = Enum.Font.GothamBold
-    plus10.TextSize = 12
-    plus10.TextColor3 = Color3.white
-    plus10.BackgroundColor3 = Color3.fromRGB(70,130,200)
-    plus10.Parent = row
-    Instance.new("UICorner", plus10).CornerRadius = UDim.new(0,5)
-
-    local function refresh()
-        local v = getFn()
-        lbl.Text = labelText .. ": " .. tostring(math.floor(v*10)/10)
-        val.Text = tostring(math.floor(v*10)/10)
+local UpdateInventory = filtergc("table", {Keys = {"UpdateInventory"}}, true).UpdateInventory
+for key, func in pairs(getgc()) do
+    if typeof(func) == "function" and islclosure(func) and debug.info(func, "l") == 122 and #debug.getupvalues(func) == 2 then
+        UpdateInventory(debug.getupvalue(func, 2), InventoryModule.MyInventory)
     end
-    minus10.MouseButton1Click:Connect(function() setFn(getFn()-10) refresh() end)
-    minus1.MouseButton1Click:Connect(function() setFn(getFn()-1) refresh() end)
-    plus1.MouseButton1Click:Connect(function() setFn(getFn()+1) refresh() end)
-    plus10.MouseButton1Click:Connect(function() setFn(getFn()+10) refresh() end)
-    refresh()
-    y = y + 32
-    return refresh
 end
 
-local refreshers = {}
-table.insert(refreshers, addRow("HIP X", function() return _G.GingerHipRX end, function(v) _G.GingerHipRX = (v+360)%360 end))
-table.insert(refreshers, addRow("HIP Y", function() return _G.GingerHipRY end, function(v) _G.GingerHipRY = (v+360)%360 end))
-table.insert(refreshers, addRow("HIP Z", function() return _G.GingerHipRZ end, function(v) _G.GingerHipRZ = (v+360)%360 end))
-table.insert(refreshers, addRow("HELD X", function() return _G.GingerHeldRX end, function(v) _G.GingerHeldRX = (v+360)%360 end))
-table.insert(refreshers, addRow("HELD Y", function() return _G.GingerHeldRY end, function(v) _G.GingerHeldRY = (v+360)%360 end))
-table.insert(refreshers, addRow("HELD Z", function() return _G.GingerHeldRZ end, function(v) _G.GingerHeldRZ = (v+360)%360 end))
-table.insert(refreshers, addRow("SIZE", function() return _G.GingerScale end, function(v) _G.GingerScale = math.clamp(v, 0.2, 2) end))
+local function isMurder()
+    local success, result = pcall(function()
+        for _, v in pairs(game.Players.LocalPlayer.Character:GetChildren()) do
+            if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
+                return true
+            end
+        end
+        for _, v in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+            if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
+                return true
+            end
+        end
+        return false
+    end)
+    if success then return result end
+    return false
+end
 
-local copyBtn = Instance.new("TextButton")
-copyBtn.Size = UDim2.new(1,-16,0,30)
-copyBtn.Position = UDim2.new(0,8,0,y+4)
-copyBtn.Text = "COPY NUMBERS"
-copyBtn.Font = Enum.Font.GothamBold
-copyBtn.TextSize = 13
-copyBtn.TextColor3 = Color3.white
-copyBtn.BackgroundColor3 = Color3.fromRGB(60,160,90)
-copyBtn.Parent = main
-Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0,6)
-copyBtn.MouseButton1Click:Connect(function()
-    local s = string.format("HIP %.1f,%.1f,%.1f HELD %.1f,%.1f,%.1f SCALE %.2f",
-        _G.GingerHipRX,_G.GingerHipRY,_G.GingerHipRZ,
-        _G.GingerHeldRX,_G.GingerHeldRY,_G.GingerHeldRZ,
-        _G.GingerScale)
-    print("[Ginger PERM] "..s)
-    pcall(function() setclipboard(s) end)
-    status.Text = s
-end)
-
--- Loops
 game.Workspace.ChildAdded:Connect(function(ch)
     if ch and ch:IsA("BasePart") and ch.Name == "StuckKnife" then
-        local m = ch:WaitForChild("Mesh",3)
-        if m then
-            local kn = ProfileData.Weapons.Equipped.Knife
-            local kd = kn and getWeaponData(kn)
-            if kd then
-                pcall(function() m.MeshId=kd.meshid m.TextureId=kd.textureid m.Scale=kd.scale end)
+        local mesh = ch:WaitForChild("Mesh")
+        if mesh then
+            local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
+            local knifedata = getWeaponData(equippedKnifeName)
+            if knifedata and isMurder() then
+                mesh.MeshId = knifedata.meshid
+                mesh.TextureId = knifedata.textureid
+                mesh.Scale = knifedata.scale
             end
         end
     end
 end)
 
-task.spawn(function()
-    while task.wait(0.2) do
-        local char = game.Players.LocalPlayer.Character
-        if not char then continue end
-        local kg = ProfileData.Weapons.Equipped.Gun
-        local kn = ProfileData.Weapons.Equipped.Knife
-        local isG = (kg == "Gingerscope")
-        if isG then
-            status.Text = string.format("HIP %.0f,%.0f,%.0f HELD %.0f,%.0f,%.0f S %.2f",
-                _G.GingerHipRX,_G.GingerHipRY,_G.GingerHipRZ,
-                _G.GingerHeldRX,_G.GingerHeldRY,_G.GingerHeldRZ,_G.GingerScale)
-        else
-            status.Text = "Equip Gingerscope (now: "..tostring(kg)..")"
-        end
-        pcall(function()
-            for _, tool in pairs(char:GetChildren()) do
-                if tool and tool:IsA("Tool") then
-                    local it = tool:GetAttribute("ItemType")
-                    local H = tool:FindFirstChild("Handle")
-                    if H then
-                        if it=="Knife" and kn then
-                            local kd=getWeaponData(kn)
-                            if kd then applyWeaponMesh(H,kd,kn,"Knife") end
-                        elseif it=="Gun" and kg then
-                            local gd=getWeaponData(kg)
-                            if gd then applyWeaponMesh(H,gd,kg,"Gun") end
+while wait() do
+    local char = game.Players.LocalPlayer.Character
+    if char then
+        local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
+        local equippedGunName = ProfileData.Weapons.Equipped.Gun
+        for _, tool in pairs(char:GetChildren()) do
+            if tool and tool:IsA("Tool") then
+                local itemType = tool:GetAttribute("ItemType")
+                local Handle = tool:FindFirstChild("Handle")
+                if Handle then
+                    if itemType == "Knife" and equippedKnifeName then
+                        local knifedata = getWeaponData(equippedKnifeName)
+                        if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
+                            applyWeaponMesh(Handle, knifedata, equippedKnifeName, "Knife")
+                        end
+                    elseif itemType == "Gun" and equippedGunName then
+                        local gundata = getWeaponData(equippedGunName)
+                        if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
+                            applyWeaponMesh(Handle, gundata, equippedGunName, "Gun")
                         end
                     end
                 end
             end
-            local rg=char:FindFirstChild("DisplayRefGun")
-            if rg and rg.Value and kg then
-                local gd=getWeaponData(kg)
-                if gd then applyWeaponMesh(rg.Value,gd,kg) end
+        end
+        local DisplayRefGun = char:FindFirstChild("DisplayRefGun")
+        if DisplayRefGun then
+            local refVal = DisplayRefGun.Value
+            if refVal and typeof(refVal) == "Instance" and equippedGunName then
+                local gundata = getWeaponData(equippedGunName)
+                if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
+                    applyWeaponMesh(refVal, gundata, equippedGunName)
+                end
             end
-            local rk=char:FindFirstChild("DisplayRefKnife")
-            if rk and rk.Value and kn then
-                local kd=getWeaponData(kn)
-                if kd then applyWeaponMesh(rk.Value,kd,kn) end
+        end
+        local DisplayRefKnife = char:FindFirstChild("DisplayRefKnife")
+        if DisplayRefKnife then
+            local refVal = DisplayRefKnife.Value
+            if refVal and typeof(refVal) == "Instance" and equippedKnifeName then
+                local knifedata = getWeaponData(equippedKnifeName)
+                if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
+                    applyWeaponMesh(refVal, knifedata, equippedKnifeName)
+                end
             end
-        end)
+        end
     end
-end)
-print("[Ginger] editor loaded")
+end
