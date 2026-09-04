@@ -84,6 +84,8 @@ end
 local GINGER_ID = "15374602183"
 local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size, others untouched
 local OTHER_SCALE = 1 -- every other gun/sword, hip+held, true size
+local SB_PITCH = -45 -- sunrise/blossom hip 45 up. Ginger untouched.
+if not _G.SBBase then _G.SBBase = {} end
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
@@ -238,6 +240,33 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             if flipHip then
                 local s0 = weaponData.scale
                 mesh.Scale = Vector3.new(-math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
+                -- 45 up, free preview only. Tied-to-player skips so it can't spin you.
+                local char = game.Players.LocalPlayer.Character
+                local tied = false
+                for _, scope in ipairs({char, refPart.Parent, game.Workspace}) do
+                    if scope then
+                        local ok, desc = pcall(function() return scope:GetDescendants() end)
+                        if ok and desc then
+                            for _, d in ipairs(desc) do
+                                if d:IsA("Motor6D") or d:IsA("Weld") then
+                                    if d.Part0 == refPart or d.Part1 == refPart then tied = true break end
+                                elseif d:IsA("WeldConstraint") or d:IsA("RigidConstraint") then
+                                    local a0 = d.Part0 or (d.Attachment0 and d.Attachment0.Parent)
+                                    local a1 = d.Part1 or (d.Attachment1 and d.Attachment1.Parent)
+                                    if a0 == refPart or a1 == refPart then
+                                        local other = (a0 == refPart) and a1 or a0
+                                        if other and char and other:IsDescendantOf(char) then tied = true break end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    if tied then break end
+                end
+                if not tied then
+                    if not _G.SBBase[refPart] then _G.SBBase[refPart] = refPart.CFrame end
+                    refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(math.rad(SB_PITCH),0,0)
+                end
             else
                 mesh.Scale = weaponData.scale * OTHER_SCALE
             end
