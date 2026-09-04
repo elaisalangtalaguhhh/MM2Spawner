@@ -237,7 +237,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             local flipHip = isDisplay and (mid:find("12322809632") or mid:find("109742397574153"))
             if flipHip then
                 local s0 = weaponData.scale
-                mesh.Scale = Vector3.new(math.abs(s0.X),-math.abs(s0.Y),-math.abs(s0.Z))
+                mesh.Scale = Vector3.new(-math.abs(s0.X),math.abs(s0.Y),-math.abs(s0.Z))
             else
                 mesh.Scale = weaponData.scale * OTHER_SCALE
             end
