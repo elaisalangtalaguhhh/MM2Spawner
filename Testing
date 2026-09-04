@@ -83,7 +83,7 @@ end
 
 local GINGER_ID = "15374602183"
 local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size, others untouched
-local OTHER_SCALE = 0.8 -- every other gun/sword, hip+held, a little smaller
+local OTHER_SCALE = 1 -- every other gun/sword, hip+held, true size
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
