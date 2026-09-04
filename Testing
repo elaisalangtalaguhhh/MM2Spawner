@@ -221,12 +221,36 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
     end
 
-    -- Mesh swap: skip cross-type (MeshPart<->FileMesh) except Ginger hip, so nothing goes gigantic.
+    -- Mesh swap: Ginger hip custom (locked perfect). Ginger held full (show in hand, default hold).
+    -- Non-ginger same-type only. Cross-type skipped entirely = no gigantic anywhere.
     local targetKind = refPart:IsA("MeshPart") and "MeshPart" or "FileMesh"
     local sourceKind = weaponData.kind or "FileMesh"
     local gingerHip = isGinger and isDisplay
-    if not gingerHip and sourceKind ~= targetKind then
-        return -- leave game default size/rotation, no gigantic
+    local gingerHeld = isGinger and not isDisplay
+    if not gingerHip and not gingerHeld and sourceKind ~= targetKind then
+        return -- non-ginger cross-type: fully default game, no gigantic
+    end
+    if gingerHeld and sourceKind ~= targetKind then
+        -- held Ginger cross-type (MeshPart sniper in Part handle): full size, positive default orientation
+        if targetKind == "FileMesh" then
+            local meshH = refPart:FindFirstChildOfClass("SpecialMesh")
+            if not meshH then
+                meshH = Instance.new("SpecialMesh")
+                meshH.Name = "Mesh"
+                meshH.Parent = refPart
+            end
+            refPart.Size = weaponData.size
+            meshH.MeshId = weaponData.meshid
+            meshH.TextureId = weaponData.textureid
+            meshH.Scale = weaponData.scale
+        else
+            local smH = refPart:FindFirstChildOfClass("SpecialMesh")
+            if smH then smH:Destroy() end
+            refPart.Size = weaponData.size
+            refPart.MeshId = weaponData.meshid
+            refPart.TextureID = weaponData.textureid
+        end
+        return -- Grip already defaulted above, hand follows arm every frame, no lock
     end
     if refPart:IsA("MeshPart") then
         local sm = refPart:FindFirstChildOfClass("SpecialMesh")
