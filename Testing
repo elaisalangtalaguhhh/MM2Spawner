@@ -57,8 +57,8 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local HIP_RX = 45 -- extra X on top of Scale flip
-local HIP_RZ = 180 -- roll 180 around barrel
+local HIP_RX = 90 -- horizontal like pic 2. 360/0 = flat, 90 = horizontal.
+local HIP_RZ = 0 -- no roll, keep flat horizontal
 local GINGER_DISPLAY_SCALE = 0.18 -- tiny to prove change, was 0.25
 print("[Ginger] vZ180 SCALE=", GINGER_DISPLAY_SCALE, "RX=", HIP_RX, "RZ=", HIP_RZ)
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
@@ -190,8 +190,8 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         local isGingerLocal = weaponData.meshid:find(GINGER_ID) ~= nil
         local isDisplayLocal = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
         if isGingerLocal and isDisplayLocal then
-            -- X-flip + Z-180 = Y-flip. 180 more to fix wrong way.
-            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
+            -- other one (X-flip) back. Horizontal via joint 90 if safe.
+            mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
         end
         -- other weapons Scale untouched
     end
