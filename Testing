@@ -57,8 +57,9 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local HIP_RX = 45 -- extra on top of Scale flip 180. 45 = 45 down past down. Total 225.
-local GINGER_DISPLAY_SCALE = 0.3 -- smaller. 0.4 kinda, 0.3 smaller, 0.25 tiny.
+local HIP_RX = 45 -- extra X on top of Scale flip
+local HIP_RZ = 180 -- roll 180 around barrel
+local GINGER_DISPLAY_SCALE = 0.25 -- a little smaller than 0.3
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerOrig then _G.GingerOrig = {} end
@@ -114,7 +115,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         if isDisplay and char then
             local joint = getHipJoint(refPart, char)
             if joint then
-                joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),0,0)
+                joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
             else
                 print("[Ginger] NO JOINT found for", refPart:GetFullName())
             end
