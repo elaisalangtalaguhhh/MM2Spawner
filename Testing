@@ -27,6 +27,11 @@ local function findMeshAndTexture(node)
         end
     end
     if node.Display and type(node.Display) == "table" then
+        local partSize
+        for _, child in ipairs(node.Display) do
+            local p = child.Props
+            if p and p.Size then partSize = p.Size end
+        end
         for _, child in ipairs(node.Display) do
             local p = child.Props
             if p then
@@ -36,7 +41,7 @@ local function findMeshAndTexture(node)
                         meshid = mid,
                         textureid = p.TextureId or p.TextureID or "",
                         scale = p.Scale or Vector3.new(1,1,1),
-                        size = p.Size or Vector3.new(0.2697,1.2582,4.2087)
+                        size = p.Size or partSize or Vector3.new(0.2697,1.2582,4.2087)
                     }
                 end
             end
