@@ -1,5 +1,5 @@
 -- testing.lua - Gingerscope rotate only, NO GUI
--- Fixed loader (SearchId -> MeshId) + muzzle DOWN
+-- v3: keep hip size same (no bigger), flip via Scale so weld type doesn't matter
 
 if not isfile("mm2data.lua") then
     local result = request({
@@ -16,11 +16,8 @@ if not data then
     return warn("failed to load data")
 end
 
--- FIXED: old code checked props.SearchId, but file uses props.MeshId (MeshPart)
--- This is why Gingerscope did nothing - getWeaponData returned nil.
 local function findMeshAndTexture(node)
     if not node or type(node) ~= "table" then return nil end
-
     local props = node.Props
     if props then
         local meshId = props.MeshId or props.MeshID or props.SearchId or props.SearchID
@@ -28,15 +25,9 @@ local function findMeshAndTexture(node)
             local textureId = props.TextureId or props.TextureID or ""
             local scale = props.Scale or Vector3.new(1, 1, 1)
             local size = props.Size or Vector3.new(0.2697, 1.2582, 4.2087)
-            return {
-                meshid = meshId,
-                textureid = textureId,
-                scale = scale,
-                size = size
-            }
+            return { meshid = meshId, textureid = textureId, scale = scale, size = size }
         end
     end
-
     if node.Display and type(node.Display) == "table" then
         local foundSize, foundMesh, foundTex, foundScale
         for _, child in ipairs(node.Display) do
@@ -48,7 +39,6 @@ local function findMeshAndTexture(node)
                 local tid = p.TextureId or p.TextureID
                 if tid ~= nil then foundTex = tid end
                 if p.Scale then foundScale = p.Scale end
-                -- MeshPart has everything in one child - return immediately
                 if mid and mid ~= "" then
                     return {
                         meshid = mid,
@@ -59,7 +49,6 @@ local function findMeshAndTexture(node)
                 end
             end
         end
-        -- Part + SpecialMesh split across 2 children
         if foundMesh then
             return {
                 meshid = foundMesh,
@@ -68,102 +57,49 @@ local function findMeshAndTexture(node)
                 size = foundSize or Vector3.new(0.045, 0.045, 0.045)
             }
         end
-        -- fallback recursive (old behaviour)
         for _, child in ipairs(node.Display) do
             local res = findMeshAndTexture(child)
             if res then return res end
         end
     end
-
     return nil
 end
 
 local function getWeaponData(name)
     local weaponData = data[name]
-    if not weaponData then
-        return nil
-    end
-
-    local found = findMeshAndTexture(weaponData)
-    if found then
-        return found
-    end
-
-    return nil
+    if not weaponData then return nil end
+    return findMeshAndTexture(weaponData)
 end
 
--- Ginger rotate fix
 if not _G.GingerOrig then _G.GingerOrig = {} end
 local GINGER_ID = "15374602183"
-local GINGER_FLIP = CFrame.Angles(math.rad(180), 0, 0) -- 180 X = muzzle down
--- for horizontal like pic 2, use: CFrame.Angles(math.rad(90), 0, 0)
 
 local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
-    if not weaponData then
-        return
-    end
-    if not weaponData.meshid then
-        return
-    end
-
+    if not weaponData or not weaponData.meshid then return end
     local isGinger = weaponData.meshid:find(GINGER_ID) ~= nil
+    local isDisplay = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
 
-    if isGinger then
+    -- HELD gun in hand: Grip only, keep normal size
+    if not isDisplay then
         if weapontype == "Gun" then
             local tool = refPart:FindFirstAncestorOfClass("Tool")
-            if tool then
+            if tool and isGinger then
                 tool.Grip = CFrame.fromMatrix(
                     Vector3.new(0, -0.5, 0.7),
                     Vector3.new(1, 0, 0),
                     Vector3.new(0, -1, 0),
                     Vector3.new(0, 0, -1)
                 )
-            end
-        else
-            -- DisplayRefGun hip visual (called without weapontype) - flip weld
-            if refPart:IsA("BasePart") and refPart:FindFirstAncestorOfClass("Tool") == nil then
-                pcall(function()
-                    local joint = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
-                    if not joint and refPart.Parent then
-                        for _, c in ipairs(refPart.Parent:GetChildren()) do
-                            if (c:IsA("Motor6D") or c:IsA("Weld")) and (c.Part0 == refPart or c.Part1 == refPart) then
-                                joint = c
-                                break
-                            end
-                        end
-                    end
-                    if joint then
-                        if not _G.GingerOrig[joint] then
-                            _G.GingerOrig[joint] = joint.C0
-                        end
-                        joint.C0 = _G.GingerOrig[joint] * GINGER_FLIP
-                    end
-                end)
-            end
-        end
-    elseif weaponData.meshid:find("79401392") then
-        if weapontype == "Gun" then
-            local tool = refPart:FindFirstAncestorOfClass("Tool")
-            if tool then
+            elseif tool and weaponData.meshid:find("79401392") then
                 tool.Grip = CFrame.fromMatrix(
                     Vector3.new(0, -0.699999988, -0.300000012),
                     Vector3.new(1, 0, 0),
                     Vector3.new(0, 0, 1),
                     Vector3.new(0, -1, 0)
                 )
-            end
-        end
-    elseif weaponData.meshid:find("6600918074") then
-        if weapontype == "Gun" then
-            local tool = refPart:FindFirstAncestorOfClass("Tool")
-            if tool then
+            elseif tool and weaponData.meshid:find("6600918074") then
                 tool.Grip = CFrame.new(1, -0.359999988, 0.00000012, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-            end
-        end
-    else
-        if weapontype == "Gun" then
-            local tool = refPart:FindFirstAncestorOfClass("Tool")
-            if tool then
+            elseif tool and weapontype == "Gun" then
                 tool.Grip = CFrame.fromMatrix(
                     Vector3.new(0, -0.5, 0.7),
                     Vector3.new(1, 0, 0),
@@ -172,22 +108,34 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 )
             end
         end
-        if refPart:IsA("BasePart") then
+    end
+
+    -- DISPLAY (hip) + HELD mesh swap
+    if refPart:IsA("MeshPart") then
+        -- MeshPart can't use negative Scale, try weld C0 flip for display
+        if isGinger and isDisplay then
             pcall(function()
                 local joint = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
-                if joint and _G.GingerOrig[joint] then
-                    joint.C0 = _G.GingerOrig[joint]
+                if not joint and refPart.Parent then
+                    for _, c in ipairs(refPart.Parent:GetChildren()) do
+                        if (c:IsA("Motor6D") or c:IsA("Weld")) and (c.Part0 == refPart or c.Part1 == refPart) then
+                            joint = c break
+                        end
+                    end
+                end
+                print("[Ginger] MeshPart display joint:", joint and joint.ClassName or "NONE - WeldConstraint?")
+                if joint then
+                    if not _G.GingerOrig[joint] then _G.GingerOrig[joint] = joint.C0 end
+                    joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(180), 0, 0)
                 end
             end)
         end
-    end
-
-    if refPart:IsA("MeshPart") then
-        local specialMesh = refPart:FindFirstChildOfClass("SpecialMesh")
-        if specialMesh then
-            specialMesh:Destroy()
+        local sm = refPart:FindFirstChildOfClass("SpecialMesh")
+        if sm then sm:Destroy() end
+        -- KEEP SIZE for display so it doesn't get bigger, only change mesh
+        if not isDisplay then
+            refPart.Size = weaponData.size
         end
-        refPart.Size = weaponData.size
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
     else
@@ -197,10 +145,22 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.Name = "Mesh"
             mesh.Parent = refPart
         end
-        refPart.Size = weaponData.size
-        mesh.MeshId = weaponData.meshid
-        mesh.TextureId = weaponData.textureid
-        mesh.Scale = weaponData.scale
+        if isGinger and isDisplay then
+            -- Flip via negative Scale = 180 X rotation, no weld edit, no size change
+            -- This is what actually rotates muzzle down on hip
+            print("[Ginger] Part display flip via Scale")
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
+            local s = weaponData.scale
+            -- use base 1,1,1 scale flipped, keep part size unchanged to avoid bigger
+            mesh.Scale = Vector3.new(s.X, -math.abs(s.Y), -math.abs(s.Z))
+            -- DO NOT touch refPart.Size here
+        else
+            refPart.Size = weaponData.size
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
+            mesh.Scale = weaponData.scale
+        end
     end
 end
 
@@ -213,7 +173,6 @@ for name, itemData in pairs(Sync.Weapons) do
     itemData.SortGroup = itemData.SortGroup or nil
     itemData.Name = itemData.Name or itemData.ItemName or name
     itemData.Rarity = itemData.Rarity or "Common"
-
     if Sync.Rarities[itemData.Rarity] then
         local weaponMeshInfo = getWeaponData(name)
         if weaponMeshInfo and weaponMeshInfo.meshid and weaponMeshInfo.textureid and weaponMeshInfo.scale and weaponMeshInfo.size then
@@ -236,20 +195,14 @@ local function isMurder()
                 return true
             end
         end
-
         for _, v in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
             if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
                 return true
             end
         end
-
         return false
     end)
-
-    if success then
-        return result
-    end
-
+    if success then return result end
     return false
 end
 
@@ -259,12 +212,10 @@ game.Workspace.ChildAdded:Connect(function(ch)
         if mesh then
             local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
             local knifedata = getWeaponData(equippedKnifeName)
-            if knifedata then
-                if isMurder() then
-                    mesh.MeshId = knifedata.meshid
-                    mesh.TextureId = knifedata.textureid
-                    mesh.Scale = knifedata.scale
-                end
+            if knifedata and isMurder() then
+                mesh.MeshId = knifedata.meshid
+                mesh.TextureId = knifedata.textureid
+                mesh.Scale = knifedata.scale
             end
         end
     end
@@ -275,7 +226,6 @@ while wait() do
     if char then
         local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
         local equippedGunName = ProfileData.Weapons.Equipped.Gun
-
         for _, tool in pairs(char:GetChildren()) do
             if tool and tool:IsA("Tool") then
                 local itemType = tool:GetAttribute("ItemType")
@@ -295,7 +245,6 @@ while wait() do
                 end
             end
         end
-
         local DisplayRefGun = char:FindFirstChild("DisplayRefGun")
         if DisplayRefGun then
             local refVal = DisplayRefGun.Value
@@ -306,7 +255,6 @@ while wait() do
                 end
             end
         end
-
         local DisplayRefKnife = char:FindFirstChild("DisplayRefKnife")
         if DisplayRefKnife then
             local refVal = DisplayRefKnife.Value
