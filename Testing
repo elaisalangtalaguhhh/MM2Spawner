@@ -103,14 +103,17 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     local char = game.Players.LocalPlayer.Character
 
     if isGinger then
-        -- HAND: untouched, game default is fine
-        -- HIP: rotate C0, Scale untouched for size
-        if isDisplay and char then
-            local joint = getHipJoint(refPart, char)
-            if joint then
-                joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),0,0)
-            end
+        -- Let game's own Gingerscope show (pic 2 correct size/rotation).
+        -- Restore anything we changed before, then do nothing.
+        if isDisplay then
+            local j = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
+            if j and _G.GingerOrig[j] then j.C0 = _G.GingerOrig[j] end
+            local mine = refPart:FindFirstChild("GingerHipMotor")
+            if mine then mine:Destroy() end
+            local wc = _G.GingerWC and _G.GingerWC[refPart]
+            if wc then pcall(function() wc.Enabled = true end) _G.GingerWC[refPart] = nil end
         end
+        return
     else
         if not isDisplay and weapontype == "Gun" then
             local tool = refPart:FindFirstAncestorOfClass("Tool")
