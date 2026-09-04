@@ -1,0 +1,247 @@
+return {
+    Gingerscope = {
+        Complete = true,
+
+        Display = {
+            {
+                Class = "MeshPart",
+                Name = "GunDisplay",
+                Path = "(root)",
+                Props = {
+                    CanCollide = false,
+                    Color = Color3.fromRGB(143, 34, 34),
+                    Material = Enum.Material.Brick,
+                    MeshId = "rbxassetid://15374602183",
+                    Reflectance = 0,
+
+                    -- 2x original size
+                    Size = Vector3.new(
+                        0.5394,
+                        2.5164,
+                        8.4174
+                    ),
+
+                    TextureID = "rbxassetid://15409041564",
+                    Transparency = 0,
+                },
+            },
+
+            {
+                Class = "MeshPart",
+                Name = "Scope",
+                Props = {
+                    CanCollide = false,
+                    Color = Color3.fromRGB(129, 181, 204),
+                    Material = Enum.Material.Glass,
+                    MeshId = "rbxassetid://15374679651",
+                    Reflectance = 1,
+
+                    -- 2x original size
+                    Size = Vector3.new(
+                        0.3742,
+                        0.3742,
+                        2.8270
+                    ),
+
+                    TextureID = "",
+                    Transparency = 0.35,
+                },
+            },
+
+            {
+                Class = "Beam",
+                Name = "CustomBeam",
+                Props = {
+                    Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(
+                            0,
+                            Color3.fromRGB(255, 255, 255)
+                        ),
+                        ColorSequenceKeypoint.new(
+                            1,
+                            Color3.fromRGB(255, 255, 255)
+                        )
+                    }),
+
+                    LightEmission = 1,
+                    Texture = "rbxassetid://15374653796",
+                    TextureLength = 1.5,
+
+                    Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 0, 0),
+                        NumberSequenceKeypoint.new(1, 0, 0)
+                    }),
+
+                    Width0 = 1,
+                    Width1 = 1,
+                },
+            },
+        },
+
+        Meta = {
+            ItemType = "Gun",
+            Rarity = "Ancient",
+            ItemID = 15666469505,
+            Year = "2023",
+            Image = "http://www.roblox.com/Thumbs/Asset.ashx?format=png&width=250&height=250&assetId=15666596216",
+            FX = true,
+            Event = "Christmas",
+            ItemName = "Gingerscope",
+        },
+
+        Model = {
+            Children = {
+                {
+                    Children = {
+                        {
+                            Class = "WeldConstraint",
+                            Id = 3,
+                            Name = "WeldConstraint",
+                            Props = {},
+                        },
+                    },
+
+                    Class = "MeshPart",
+                    Id = 2,
+                    Name = "Scope",
+
+                    Props = {
+                        CanCollide = false,
+                        CastShadow = true,
+                        Color = Color3.fromRGB(129, 181, 204),
+                        DoubleSided = false,
+                        Material = Enum.Material.Glass,
+                        MeshId = "rbxassetid://15374679651",
+                        Reflectance = 1,
+
+                        -- Scope position scaled 2x
+                        RelCF = CFrame.new(
+                            0,
+                            0.96630,
+                            0.41446,
+                            1, 0, 0,
+                            0, 1, 0,
+                            0, 0, 1
+                        ),
+
+                        Size = Vector3.new(
+                            0.37424,
+                            0.37424,
+                            2.82710
+                        ),
+
+                        TextureID = "",
+                        Transparency = 0.35,
+                    },
+                },
+
+                {
+                    Class = "Beam",
+                    Id = 4,
+                    Name = "CustomBeam",
+
+                    Props = {
+                        Color = ColorSequence.new({
+                            ColorSequenceKeypoint.new(
+                                0,
+                                Color3.fromRGB(255, 255, 255)
+                            ),
+                            ColorSequenceKeypoint.new(
+                                1,
+                                Color3.fromRGB(255, 255, 255)
+                            ),
+                        }),
+
+                        CurveSize0 = 0,
+                        CurveSize1 = 0,
+                        Enabled = true,
+                        FaceCamera = false,
+                        LightEmission = 1,
+                        LightInfluence = 0,
+                        Segments = 10,
+
+                        Texture = "rbxassetid://15374653796",
+                        TextureLength = 1.5,
+                        TextureMode = Enum.TextureMode.Wrap,
+                        TextureSpeed = 0,
+
+                        Transparency = NumberSequence.new({
+                            NumberSequenceKeypoint.new(0, 0, 0),
+                            NumberSequenceKeypoint.new(1, 0, 0),
+                        }),
+
+                        Width0 = 1,
+                        Width1 = 1,
+                        ZOffset = 0,
+                    },
+                },
+
+                {
+                    Class = "Attachment",
+                    Id = 5,
+                    Name = "CustomAttachment",
+
+                    Props = {
+                        RelCF = CFrame.new(
+                            0.25982,
+                            -0.00006,
+                            0.15,
+                            1, 0, 0,
+                            0, 0.70713, 0.70708,
+                            0, -0.70708, 0.70713
+                        ),
+                    },
+                },
+
+                {
+                    Class = "Sound",
+                    Id = 6,
+                    Name = "AltSound",
+                    Props = {},
+                },
+
+                {
+                    Class = "RigidConstraint",
+                    Id = 7,
+                    Name = "RigidConstraint",
+                    Props = {},
+                },
+            },
+
+            Class = "MeshPart",
+            Id = 1,
+            Name = "GunDisplay",
+
+            Props = {
+                CanCollide = false,
+                CastShadow = true,
+                Color = Color3.fromRGB(143, 34, 34),
+                DoubleSided = false,
+                Material = Enum.Material.Brick,
+                MeshId = "rbxassetid://15374602183",
+                Reflectance = 0,
+
+                -- 180° X rotation:
+                -- flips the Gingerscope so the muzzle points downward
+                RelCF = CFrame.new(
+                    0, 0, 0,
+                    1, 0, 0,
+                    0, -1, 0,
+                    0, 0, -1
+                ),
+
+                -- 2x original size
+                Size = Vector3.new(
+                    0.5394,
+                    2.5163,
+                    8.4174
+                ),
+
+                TextureID = "rbxassetid://15409041564",
+                Transparency = 0,
+            },
+        },
+
+        MeshCount = 1,
+    },
+}
