@@ -130,7 +130,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
             if isDisplay then
-                mesh.Scale = Vector3.new(1,-1,-1)
+                mesh.Scale = Vector3.new(GINGER_SCALE,-GINGER_SCALE,-GINGER_SCALE)
                 refPart.Size = weaponData.size * GINGER_SCALE
             else
                 refPart.Size = weaponData.size * GINGER_SCALE
