@@ -84,7 +84,7 @@ end
 local GINGER_ID = "15374602183"
 local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size, others untouched
 local OTHER_SCALE = 1 -- every other gun/sword, hip+held, true size
-local SB_PITCH = -45 -- sunrise/blossom hip 45 up. Ginger untouched.
+local SB_YAW = 45 -- sunrise/blossom horizontal yaw. Ginger untouched.
 if not _G.SBBase then _G.SBBase = {} end
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
@@ -112,6 +112,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             end
             _G.GingerHipLocked[refPart] = nil
             _G.GingerMeshOrig[refPart] = nil
+            if _G.SBBase then _G.SBBase[refPart] = nil end
         end
         return
     end
@@ -180,6 +181,12 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
+                if _G.SBBase then _G.SBBase[refPart] = nil end
+                if _G.SBAttachOrig then
+                    for a, _ in pairs(_G.SBAttachOrig) do
+                        if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+                    end
+                end
             end
             if (weaponData.kind or "FileMesh") ~= "MeshPart" then return end
         end
@@ -221,6 +228,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
+                if _G.SBBase then _G.SBBase[refPart] = nil end
             end
             if (weaponData.kind or "FileMesh") ~= "FileMesh" then
                 -- cross-type new MeshPart gun in old Part slot: restore default look instead of giant
@@ -238,14 +246,25 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             local mid = weaponData.meshid or ""
             local flipHip = isDisplay and (mid:find("12322809632") or mid:find("109742397574153"))
             if flipHip then
+                if not _G.GingerMeshOrig[refPart] then
+                    _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
+                end
                 local s0 = weaponData.scale
                 mesh.Scale = Vector3.new(-math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
-                -- 45 up, local check only (no Workspace scan). Character-held skips.
+                -- horizontal 45 yaw. Free preview via CFrame, character part via Attachment.
                 local char = game.Players.LocalPlayer.Character
                 local inChar = char and refPart:IsDescendantOf(char)
                 if not inChar then
                     if not _G.SBBase[refPart] then _G.SBBase[refPart] = refPart.CFrame end
-                    refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(math.rad(SB_PITCH),0,0)
+                    refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(0,math.rad(SB_YAW),0)
+                else
+                    for _, a in ipairs(refPart:GetChildren()) do
+                        if a:IsA("Attachment") then
+                            if not _G.SBAttachOrig then _G.SBAttachOrig = {} end
+                            if not _G.SBAttachOrig[a] then _G.SBAttachOrig[a] = a.CFrame end
+                            a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(0,math.rad(SB_YAW),0)
+                        end
+                    end
                 end
             else
                 mesh.Scale = weaponData.scale * OTHER_SCALE
