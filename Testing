@@ -58,10 +58,10 @@ end
 
 local GINGER_ID = "15374602183"
 local HIP_RX = 90 -- horizontal
-local HIP_RY = 180 -- opposite horizontal
-local HIP_RZ = 180 -- upside down
-local GINGER_DISPLAY_SCALE = 0.15 -- a little smaller than 0.18
-print("[Ginger] v360 SCALE=", GINGER_DISPLAY_SCALE, "RX=", HIP_RX, "RY=", HIP_RY, "RZ=", HIP_RZ)
+local HIP_RY = 0 -- 720 = 0 flat
+local HIP_RZ = 0 -- flat, no roll
+local GINGER_DISPLAY_SCALE = 0.15
+print("[Ginger] v720 SCALE=", GINGER_DISPLAY_SCALE, "RX=", HIP_RX, "RY=", HIP_RY, "RZ=", HIP_RZ)
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerOrig then _G.GingerOrig = {} end
@@ -135,18 +135,55 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                     print("[Ginger] SKIP backwards joint to avoid spinning player:", joint:GetFullName(), joint.ClassName)
                 end
             else
-                -- No Motor6D/Weld found: try RigidConstraint Attachments, else do nothing.
-                -- Never set refPart.CFrame here: if welded to player it spins the player.
-                local didAttach = false
-                for _, a in ipairs(refPart:GetChildren()) do
-                    if a:IsA("Attachment") then
-                        if not _G.GingerOrig[a] then _G.GingerOrig[a] = a.CFrame end
-                        a.CFrame = _G.GingerOrig[a] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
-                        didAttach = true
+                -- No joint: check RigidConstraint to player. If free preview, CFrame safe.
+                local tiedToPlayer = false
+                local scopes = {}
+                if char then table.insert(scopes, char) end
+                if refPart.Parent then table.insert(scopes, refPart.Parent) end
+                table.insert(scopes, game.Workspace)
+                for _, scope in ipairs(scopes) do
+                    local ok, desc = pcall(function() return scope:GetDescendants() end)
+                    if ok and desc then
+                        for _, d in ipairs(desc) do
+                            if d:IsA("RigidConstraint") then
+                                -- RigidConstraint uses Attachments, check parents
+                                local p0 = d.Attachment0 and d.Attachment0.Parent
+                                local p1 = d.Attachment1 and d.Attachment1.Parent
+                                if p0 == refPart or p1 == refPart then
+                                    local other = (p0 == refPart) and p1 or p0
+                                    if other and char and other:IsDescendantOf(char) then
+                                        tiedToPlayer = true break
+                                    end
+                                end
+                            elseif d:IsA("WeldConstraint") then
+                                if d.Part0 == refPart or d.Part1 == refPart then
+                                    local other = (d.Part0 == refPart) and d.Part1 or d.Part0
+                                    if other and char and other:IsDescendantOf(char) then
+                                        tiedToPlayer = true break
+                                    end
+                                end
+                            end
+                        end
                     end
+                    if tiedToPlayer then break end
                 end
-                if not didAttach then
-                    print("[Ginger] NO JOINT, left alone to avoid spinning player:", refPart:GetFullName())
+                if tiedToPlayer then
+                    local didAttach = false
+                    for _, a in ipairs(refPart:GetChildren()) do
+                        if a:IsA("Attachment") then
+                            if not _G.GingerOrig[a] then _G.GingerOrig[a] = a.CFrame end
+                            a.CFrame = _G.GingerOrig[a] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
+                            didAttach = true
+                        end
+                    end
+                    if not didAttach then
+                        print("[Ginger] tied to player, left alone:", refPart:GetFullName())
+                    end
+                else
+                    -- free Workspace preview: CFrame cannot spin player
+                    if not _G.GingerCF then _G.GingerCF = {} end
+                    if not _G.GingerCF[refPart] then _G.GingerCF[refPart] = refPart.CFrame end
+                    refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
                 end
             end
         end
