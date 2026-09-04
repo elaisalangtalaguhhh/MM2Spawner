@@ -73,7 +73,7 @@ end
 
 if not _G.GingerOrig then _G.GingerOrig = {} end
 local GINGER_ID = "15374602183"
-local GINGER_SCALE = 0.10 -- lower = smaller, 1.0 = current big, try 0.6-0.8 to match pic 2
+local GINGER_SCALE = 0.45 -- lower = smaller, 1.0 = current big, try 0.6-0.8 to match pic 2
 -- kill old loops when re-executing, so size actually updates
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
