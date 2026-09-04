@@ -139,6 +139,8 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         -- ginger hip: scale Size too so GINGER_SCALE works for MeshPart
         if isGinger and isDisplay then
             refPart.Size = weaponData.size * GINGER_SCALE
+        elseif isGinger and not isDisplay then
+            refPart.Size = weaponData.size * GINGER_SCALE
         elseif not isDisplay then
             refPart.Size = weaponData.size
         end
@@ -161,6 +163,14 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.Scale = Vector3.new(s.X * GINGER_SCALE, -math.abs(s.Y) * GINGER_SCALE, -math.abs(s.Z) * GINGER_SCALE)
             print("[Ginger] Part flip Scale=", tostring(mesh.Scale), "GINGER_SCALE=", GINGER_SCALE)
             -- DO NOT touch refPart.Size here
+        elseif isGinger and not isDisplay then
+            -- HELD ginger: apply same shrink so held doesn't stay big
+            refPart.Size = weaponData.size * GINGER_SCALE
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
+            local s = weaponData.scale
+            mesh.Scale = Vector3.new(s.X * GINGER_SCALE, s.Y * GINGER_SCALE, s.Z * GINGER_SCALE)
+            print("[Ginger] Held flip Scale=", tostring(mesh.Scale))
         else
             refPart.Size = weaponData.size
             mesh.MeshId = weaponData.meshid
