@@ -69,6 +69,8 @@ local MY_RUN = getgenv().GingerRunId
 if not _G.GingerOrig then _G.GingerOrig = {} end
 if not _G.GingerWC then _G.GingerWC = {} end
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
+if not _G.GingerHipJoint then _G.GingerHipJoint = {} end
+if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
 
 local function getHipJoint(refPart, char)
     local mine = refPart:FindFirstChild("GingerHipMotor")
@@ -142,6 +144,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 -- Only touch if display is Part1 (moves item). If display is Part0, C0 moves player.
                 if joint.Part1 == refPart then
                     joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),math.rad(HIP_RY),math.rad(HIP_RZ))
+                    _G.GingerHipJoint[refPart] = joint
                 else
                     print("[Ginger] SKIP backwards joint to avoid spinning player:", joint:GetFullName(), joint.ClassName)
                 end
@@ -199,7 +202,57 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             end
         end
     else
-        return -- non-Ginger: fully default game. No Grip/mesh touches = cannot go giant from here.
+        -- Switching away from Ginger: release hip lock, restore joint, show new gun if same-type safe.
+        if isDisplay then
+            local hj = _G.GingerHipJoint[refPart]
+            if hj and _G.GingerOrig[hj] then
+                pcall(function()
+                    if hj.Part1 == refPart then hj.C0 = _G.GingerOrig[hj] end
+                end)
+            end
+            _G.GingerHipJoint[refPart] = nil
+            local mine = refPart:FindFirstChild("GingerHipMotor")
+            if mine then mine:Destroy() end
+            local wc = _G.GingerWC[refPart]
+            if wc then pcall(function() wc.Enabled = true end) _G.GingerWC[refPart] = nil end
+            _G.GingerHipLocked[refPart] = nil
+            local snap = _G.GingerMeshOrig[refPart]
+            _G.GingerMeshOrig[refPart] = nil
+            if _G.GingerCF then _G.GingerCF[refPart] = nil end
+            -- show newly equipped gun/sword, same-type IDs only so never giant.
+            -- cross-type: restore pre-Ginger look so stale Ginger doesn't stick.
+            local targetKind2 = refPart:IsA("MeshPart") and "MeshPart" or "FileMesh"
+            local sourceKind2 = weaponData.kind or "FileMesh"
+            if sourceKind2 == targetKind2 then
+                if targetKind2 == "MeshPart" then
+                    local sm2 = refPart:FindFirstChildOfClass("SpecialMesh")
+                    if sm2 then sm2:Destroy() end
+                    refPart.MeshId = weaponData.meshid
+                    refPart.TextureID = weaponData.textureid
+                else
+                    local m2 = refPart:FindFirstChildOfClass("SpecialMesh")
+                    if m2 then
+                        m2.MeshId = weaponData.meshid
+                        m2.TextureId = weaponData.textureid
+                    end
+                end
+            else
+                if snap then
+                    if targetKind2 == "MeshPart" then
+                        if snap.MeshId then refPart.MeshId = snap.MeshId end
+                        if snap.TextureID then refPart.TextureID = snap.TextureID end
+                    else
+                        local m3 = refPart:FindFirstChildOfClass("SpecialMesh")
+                        if m3 then
+                            if snap.MeshId then m3.MeshId = snap.MeshId end
+                            if snap.TextureId then m3.TextureId = snap.TextureId end
+                            if snap.Scale then m3.Scale = snap.Scale end
+                        end
+                    end
+                end
+            end
+        end
+        return
     end
 
     -- Mesh swap: Ginger only from here (non-Ginger returned above).
@@ -243,6 +296,9 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     if refPart:IsA("MeshPart") then
         local sm = refPart:FindFirstChildOfClass("SpecialMesh")
         if sm then sm:Destroy() end
+        if gingerHip and not _G.GingerMeshOrig[refPart] then
+            _G.GingerMeshOrig[refPart] = {MeshId = refPart.MeshId, TextureID = refPart.TextureID}
+        end
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
         if gingerHip then _G.GingerHipLocked[refPart] = true end
@@ -252,6 +308,9 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh = Instance.new("SpecialMesh")
             mesh.Name = "Mesh"
             mesh.Parent = refPart
+        end
+        if isGingerLocal and isDisplayLocal and not _G.GingerMeshOrig[refPart] then
+            _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
         end
         mesh.MeshId = weaponData.meshid
         mesh.TextureId = weaponData.textureid
