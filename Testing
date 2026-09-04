@@ -1,5 +1,5 @@
 -- testing.lua - Gingerscope rotate only, NO GUI
--- Based on your Files (1).txt, + muzzle DOWN fix for 15374602183
+-- Fixed loader (SearchId -> MeshId) + muzzle DOWN
 
 if not isfile("mm2data.lua") then
     local result = request({
@@ -16,16 +16,18 @@ if not data then
     return warn("failed to load data")
 end
 
+-- FIXED: old code checked props.SearchId, but file uses props.MeshId (MeshPart)
+-- This is why Gingerscope did nothing - getWeaponData returned nil.
 local function findMeshAndTexture(node)
     if not node or type(node) ~= "table" then return nil end
 
     local props = node.Props
     if props then
-        local meshId = props.MeshId or props.MeshID
+        local meshId = props.MeshId or props.MeshID or props.SearchId or props.SearchID
         if meshId and meshId ~= "" then
             local textureId = props.TextureId or props.TextureID or ""
-            local scale = props.Scale or Vector3.new(0.045,0.045,0.045)
-            local size = props.Size or Vector3.new(0.045,0.045,0.045)
+            local scale = props.Scale or Vector3.new(1, 1, 1)
+            local size = props.Size or Vector3.new(0.2697, 1.2582, 4.2087)
             return {
                 meshid = meshId,
                 textureid = textureId,
@@ -36,6 +38,37 @@ local function findMeshAndTexture(node)
     end
 
     if node.Display and type(node.Display) == "table" then
+        local foundSize, foundMesh, foundTex, foundScale
+        for _, child in ipairs(node.Display) do
+            local p = child.Props
+            if p then
+                if p.Size then foundSize = p.Size end
+                local mid = p.MeshId or p.MeshID or p.SearchId or p.SearchID
+                if mid and mid ~= "" then foundMesh = mid end
+                local tid = p.TextureId or p.TextureID
+                if tid ~= nil then foundTex = tid end
+                if p.Scale then foundScale = p.Scale end
+                -- MeshPart has everything in one child - return immediately
+                if mid and mid ~= "" then
+                    return {
+                        meshid = mid,
+                        textureid = tid or foundTex or "",
+                        scale = p.Scale or Vector3.new(1, 1, 1),
+                        size = p.Size or foundSize or Vector3.new(0.2697, 1.2582, 4.2087)
+                    }
+                end
+            end
+        end
+        -- Part + SpecialMesh split across 2 children
+        if foundMesh then
+            return {
+                meshid = foundMesh,
+                textureid = foundTex or "",
+                scale = foundScale or Vector3.new(1, 1, 1),
+                size = foundSize or Vector3.new(0.045, 0.045, 0.045)
+            }
+        end
+        -- fallback recursive (old behaviour)
         for _, child in ipairs(node.Display) do
             local res = findMeshAndTexture(child)
             if res then return res end
@@ -139,7 +172,6 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 )
             end
         end
-        -- restore hip weld for non-ginger guns
         if refPart:IsA("BasePart") then
             pcall(function()
                 local joint = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
