@@ -199,30 +199,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             end
         end
     else
-        if not isDisplay and weapontype == "Gun" then
-            local tool = refPart:FindFirstAncestorOfClass("Tool")
-            if tool then
-                if weaponData.meshid:find("79401392") then
-                    tool.Grip = CFrame.fromMatrix(Vector3.new(0,-0.699999988,-0.300000012), Vector3.new(1,0,0), Vector3.new(0,0,1), Vector3.new(0,-1,0))
-                elseif weaponData.meshid:find("6600918074") then
-                    tool.Grip = CFrame.new(1,-0.359999988,0.00000012,0,0,1,0,1,0,-1,0,0)
-                else
-                    tool.Grip = CFrame.fromMatrix(Vector3.new(0,-0.5,0.7), Vector3.new(1,0,0), Vector3.new(0,1,0), Vector3.new(0,0,1))
-                end
-            end
-        end
-        if isDisplay then
-            local j = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
-            if j and _G.GingerOrig[j] then j.C0 = _G.GingerOrig[j] end
-            local mine = refPart:FindFirstChild("GingerHipMotor")
-            if mine then mine:Destroy() end
-            local wc = _G.GingerWC[refPart]
-            if wc then pcall(function() wc.Enabled = true end) _G.GingerWC[refPart] = nil end
-        end
+        return -- non-Ginger: fully default game. No Grip/mesh touches = cannot go giant from here.
     end
 
-    -- Mesh swap: Ginger hip custom (locked perfect). Ginger held full (show in hand, default hold).
-    -- Non-ginger same-type only. Cross-type skipped entirely = no gigantic anywhere.
+    -- Mesh swap: Ginger only from here (non-Ginger returned above).
     local targetKind = refPart:IsA("MeshPart") and "MeshPart" or "FileMesh"
     local sourceKind = weaponData.kind or "FileMesh"
     local gingerHip = isGinger and isDisplay
@@ -231,7 +211,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         return -- non-ginger cross-type: fully default game, no gigantic
     end
     if gingerHeld and sourceKind ~= targetKind then
-        -- held Ginger cross-type: IDs only, keep hand slot Size/Scale so never gigantic
+        -- held Ginger cross-type: same tiny size as hip, positive default orientation
         if targetKind == "FileMesh" then
             local meshH = refPart:FindFirstChildOfClass("SpecialMesh")
             if not meshH then
@@ -241,13 +221,24 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             end
             meshH.MeshId = weaponData.meshid
             meshH.TextureId = weaponData.textureid
+            meshH.Scale = Vector3.new(GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
         else
             local smH = refPart:FindFirstChildOfClass("SpecialMesh")
             if smH then smH:Destroy() end
+            refPart.Size = weaponData.size * GINGER_DISPLAY_SCALE
             refPart.MeshId = weaponData.meshid
             refPart.TextureID = weaponData.textureid
         end
         return -- Grip already defaulted above, hand follows arm every frame, no lock
+    end
+    if gingerHeld and sourceKind == targetKind and targetKind == "MeshPart" then
+        -- held Ginger same-type MeshPart: shrink to hip tiny size too
+        local smH2 = refPart:FindFirstChildOfClass("SpecialMesh")
+        if smH2 then smH2:Destroy() end
+        refPart.Size = weaponData.size * GINGER_DISPLAY_SCALE
+        refPart.MeshId = weaponData.meshid
+        refPart.TextureID = weaponData.textureid
+        return
     end
     if refPart:IsA("MeshPart") then
         local sm = refPart:FindFirstChildOfClass("SpecialMesh")
