@@ -51,7 +51,7 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local GINGER_SCALE = 0.65 -- sniper is long, 0.6-0.7 matches pic 2. 1.0 = full big.
+local GINGER_SCALE = 0.15 -- sniper is long, 0.6-0.7 matches pic 2. 1.0 = full big.
 
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
