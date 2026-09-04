@@ -123,17 +123,25 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     local char = game.Players.LocalPlayer.Character
 
     if isGinger then
-        -- Hip only: rotate to match pic 2 horizontal. Hand untouched.
-        -- Mesh below still applies so it appears even without owning.
+        -- Hip only. Hand untouched. Never move Character.
         if isDisplay then
             local joint = getHipJoint(refPart, char)
             if joint then
                 joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
             else
-                -- Workspace preview has no joint: rotate part itself around stored base
-                if not _G.GingerCF then _G.GingerCF = {} end
-                if not _G.GingerCF[refPart] then _G.GingerCF[refPart] = refPart.CFrame end
-                refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
+                -- No Motor6D/Weld found: try RigidConstraint Attachments, else do nothing.
+                -- Never set refPart.CFrame here: if welded to player it spins the player.
+                local didAttach = false
+                for _, a in ipairs(refPart:GetChildren()) do
+                    if a:IsA("Attachment") then
+                        if not _G.GingerOrig[a] then _G.GingerOrig[a] = a.CFrame end
+                        a.CFrame = _G.GingerOrig[a] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
+                        didAttach = true
+                    end
+                end
+                if not didAttach then
+                    print("[Ginger] NO JOINT, left alone to avoid spinning player:", refPart:GetFullName())
+                end
             end
         end
     else
