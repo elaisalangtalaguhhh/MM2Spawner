@@ -154,12 +154,12 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         if isGinger and isDisplay then
             -- Flip via negative Scale = 180 X rotation, no weld edit, no size change
             -- This is what actually rotates muzzle down on hip
-            print("[Ginger] Part display flip via Scale")
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
             local s = weaponData.scale
             -- use base scale flipped + GINGER_SCALE shrink, keep part size unchanged
             mesh.Scale = Vector3.new(s.X * GINGER_SCALE, -math.abs(s.Y) * GINGER_SCALE, -math.abs(s.Z) * GINGER_SCALE)
+            print("[Ginger] Part flip Scale=", tostring(mesh.Scale), "GINGER_SCALE=", GINGER_SCALE)
             -- DO NOT touch refPart.Size here
         else
             refPart.Size = weaponData.size
