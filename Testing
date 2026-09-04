@@ -249,7 +249,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                         if ok and desc then
                             for _, d in ipairs(desc) do
                                 if d:IsA("Motor6D") or d:IsA("Weld") then
-                                    if d.Part0 == refPart or d.Part1 == refPart then tied = true break end
+                                    if d.Part0 == refPart or d.Part1 == refPart then
+                                        local other = (d.Part0 == refPart) and d.Part1 or d.Part0
+                                        if other and char and other:IsDescendantOf(char) then tied = true break end
+                                    end
                                 elseif d:IsA("WeldConstraint") or d:IsA("RigidConstraint") then
                                     local a0 = d.Part0 or (d.Attachment0 and d.Attachment0.Parent)
                                     local a1 = d.Part1 or (d.Attachment1 and d.Attachment1.Parent)
