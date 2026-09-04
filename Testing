@@ -59,7 +59,8 @@ end
 local GINGER_ID = "15374602183"
 local HIP_RX = 45 -- extra X on top of Scale flip
 local HIP_RZ = 180 -- roll 180 around barrel
-local GINGER_DISPLAY_SCALE = 0.25 -- a little smaller than 0.3
+local GINGER_DISPLAY_SCALE = 0.18 -- tiny to prove change, was 0.25
+print("[Ginger] vZ180 SCALE=", GINGER_DISPLAY_SCALE, "RX=", HIP_RX, "RZ=", HIP_RZ)
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerOrig then _G.GingerOrig = {} end
