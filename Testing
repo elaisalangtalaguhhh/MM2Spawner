@@ -52,7 +52,7 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local HIP_RX = 135 -- 180 = down, 135 = 45 up from down, 90 = horizontal like pic 2. Hip only, hand untouched.
+local HIP_RX = 225 -- 180 = down, 225 = 45 down past down. Hip only, rotation only, Scale untouched.
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerOrig then _G.GingerOrig = {} end
