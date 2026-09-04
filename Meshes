@@ -244,4 +244,221 @@ return {
 
         MeshCount = 1,
     },
+    Blossom_G = {
+        Complete = true,
+        Display = {
+            {
+                Class = "Part",
+                Name = "GunDisplay",
+                Path = "(root)",
+                Props = {
+                    CanCollide = false,
+                    Color = Color3.fromRGB(163, 162, 165),
+                    Material = Enum.Material.Plastic,
+                    Reflectance = 0,
+                    Shape = Enum.PartType.Block,
+                    Size = Vector3.new(0.6061, 0.2658, 1.1624),
+                    Transparency = 0,
+                },
+            },
+            {
+                Class = "SpecialMesh",
+                Name = "Mesh",
+                Props = {
+                    MeshId = "rbxassetid://12322809632",
+                    MeshType = Enum.MeshType.FileMesh,
+                    Offset = Vector3.new(0, 0, 0),
+                    Scale = Vector3.new(0.0476, 0.0441, 0.0438),
+                    TextureId = "rbxassetid://12322809917",
+                    VertexColor = Vector3.new(1, 1, 1),
+                },
+            }
+        },
+        Meta = {
+            Season = 1,
+            ItemType = "Gun",
+            Rarity = "Godly",
+            ItemID = 12339377105,
+            Image = "http://www.roblox.com/Thumbs/Asset.ashx?format=png&width=250&height=250&assetId=12339377105",
+            ItemName = "Blossom",
+        },
+        Model = {
+            Children = {
+                {
+                    Class = "SpecialMesh",
+                    Id = 2,
+                    Name = "Mesh",
+                    Props = {
+                        MeshId = "rbxassetid://12322809632",
+                        MeshType = Enum.MeshType.FileMesh,
+                        Offset = Vector3.new(0, 0, 0),
+                        Scale = Vector3.new(0.04763, 0.04413, 0.04382),
+                        TextureId = "rbxassetid://12322809917",
+                        VertexColor = Vector3.new(1, 1, 1),
+                    },
+                },
+                {
+                    Class = "Attachment",
+                    Id = 3,
+                    Name = "CustomAttachment",
+                    Props = {
+                        RelCF = CFrame.new(0, -0.20001, 0.0899, 1, 0, 0, 0, 0.64276, 0.76607, 0, -0.76607, 0.64276),
+                    },
+                },
+                {
+                    Class = "RigidConstraint",
+                    Id = 4,
+                    Name = "RigidConstraint",
+                    Props = {},
+                }
+            },
+            Class = "Part",
+            Id = 1,
+            Name = "GunDisplay",
+            Props = {
+                CanCollide = false,
+                CastShadow = true,
+                Color = Color3.fromRGB(163, 162, 165),
+                Material = Enum.Material.Plastic,
+                Reflectance = 0,
+                RelCF = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                Shape = Enum.PartType.Block,
+                Size = Vector3.new(0.60612, 0.26582, 1.16242),
+                Transparency = 0,
+            },
+        },
+        MeshCount = 1,
+    },
+    SunsetGunChroma = {
+        Complete = true,
+        Display = {
+            {
+                Class = "Part",
+                Name = "GunDisplay",
+                Path = "(root)",
+                Props = {
+                    CanCollide = false,
+                    Color = Color3.fromRGB(163, 162, 165),
+                    Material = Enum.Material.Plastic,
+                    Reflectance = 0,
+                    Shape = Enum.PartType.Block,
+                    Size = Vector3.new(0.4842, 1.3751, 2.0852),
+                    Transparency = 0,
+                },
+            },
+            {
+                Class = "SpecialMesh",
+                Name = "Mesh",
+                Props = {
+                    MeshId = "rbxassetid://109742397574153",
+                    MeshType = Enum.MeshType.FileMesh,
+                    Offset = Vector3.new(0, 0, 0),
+                    Scale = Vector3.new(0.0471, 0.0471, 0.0471),
+                    TextureId = "rbxassetid://71731808219690",
+                    VertexColor = Vector3.new(1, 1, 1),
+                },
+            },
+            {
+                Class = "Decal",
+                Name = "Chroma",
+                Props = {
+                    Color3 = Color3.fromRGB(255, 10, 0),
+                    Face = Enum.NormalId.Left,
+                    Texture = "rbxassetid://87234234470516",
+                    Transparency = 0,
+                },
+            },
+            {
+                Class = "Decal",
+                Name = "Glow",
+                Props = {
+                    Color3 = Color3.fromRGB(2555, 2322, 200),
+                    Face = Enum.NormalId.Left,
+                    Texture = "rbxassetid://122480499480858",
+                    Transparency = 1,
+                },
+            }
+        },
+        Meta = {
+            ItemType = "Gun",
+            Rarity = "Godly",
+            ItemID = 129480661108374,
+            Year = "2025",
+            Chroma = true,
+            Image = "rbxthumb://type=Asset&w=150&h=150&id=124766755976937",
+            FX = true,
+            Event = "Summer",
+            ItemName = "Sunrise",
+        },
+        Model = {
+            Children = {
+                {
+                    Class = "SpecialMesh",
+                    Id = 2,
+                    Name = "Mesh",
+                    Props = {
+                        MeshId = "rbxassetid://109742397574153",
+                        MeshType = Enum.MeshType.FileMesh,
+                        Offset = Vector3.new(0, 0, 0),
+                        Scale = Vector3.new(0.0471, 0.0471, 0.0471),
+                        TextureId = "rbxassetid://71731808219690",
+                        VertexColor = Vector3.new(1, 1, 1),
+                    },
+                },
+                {
+                    Class = "Attachment",
+                    Id = 3,
+                    Name = "CustomAttachment",
+                    Props = {
+                        RelCF = CFrame.new(0, -0.19998, 0.08992, 1, 0, 0, 0, 0.64276, 0.76607, 0, -0.76607, 0.64276),
+                    },
+                },
+                {
+                    Class = "Decal",
+                    Id = 4,
+                    Name = "Chroma",
+                    Props = {
+                        Color3 = Color3.fromRGB(255, 10, 0),
+                        Face = Enum.NormalId.Left,
+                        Texture = "rbxassetid://87234234470516",
+                        Transparency = 0,
+                        ZIndex = 1,
+                    },
+                },
+                {
+                    Class = "Decal",
+                    Id = 5,
+                    Name = "Glow",
+                    Props = {
+                        Color3 = Color3.fromRGB(2555, 2322, 200),
+                        Face = Enum.NormalId.Left,
+                        Texture = "rbxassetid://122480499480858",
+                        Transparency = 1,
+                        ZIndex = 2,
+                    },
+                },
+                {
+                    Class = "RigidConstraint",
+                    Id = 6,
+                    Name = "RigidConstraint",
+                    Props = {},
+                }
+            },
+            Class = "Part",
+            Id = 1,
+            Name = "GunDisplay",
+            Props = {
+                CanCollide = false,
+                CastShadow = true,
+                Color = Color3.fromRGB(163, 162, 165),
+                Material = Enum.Material.Plastic,
+                Reflectance = 0,
+                RelCF = CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                Shape = Enum.PartType.Block,
+                Size = Vector3.new(0.48417, 1.37511, 2.08516),
+                Transparency = 0,
+            },
+        },
+        MeshCount = 1,
+    },
 }
