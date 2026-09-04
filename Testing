@@ -127,7 +127,12 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         if isDisplay then
             local joint = getHipJoint(refPart, char)
             if joint then
-                joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
+                -- Only touch if display is Part1 (moves item). If display is Part0, C0 moves player.
+                if joint.Part1 == refPart then
+                    joint.C0 = _G.GingerOrig[joint] * CFrame.Angles(math.rad(HIP_RX),0,math.rad(HIP_RZ))
+                else
+                    print("[Ginger] SKIP backwards joint to avoid spinning player:", joint:GetFullName(), joint.ClassName)
+                end
             else
                 -- No Motor6D/Weld found: try RigidConstraint Attachments, else do nothing.
                 -- Never set refPart.CFrame here: if welded to player it spins the player.
