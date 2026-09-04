@@ -57,7 +57,7 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local HIP_RX = -90 -- -225 from 135
+local HIP_RX = 135 -- back from -90 flip
 local HIP_RY = 0 -- 180 spin from 180
 local HIP_RZ = 0
 local GINGER_DISPLAY_SCALE = 0.15
