@@ -1,19 +1,6 @@
--- MM2 Inventory Spawner + Equipper + Side Visuals GUI
--- Executor-only (Synapse / Arceus / Solara / etc). Execute once in Murder Mystery 2.
--- Features: unlock/spawn any weapon to inventory, equip Knife/Gun, live side-hip visuals (DisplayRefKnife/Gun) + held tool visuals.
--- FIXED: Gingerscope muzzle points DOWN (180 X flip) like pic 2, not UP like pic 1.
+-- testing.lua - Gingerscope rotate only, NO GUI
+-- Based on your Files (1).txt, + muzzle DOWN fix for 15374602183
 
-if getgenv().MM2SpawnerLoaded then
-    pcall(function()
-        if getgenv().MM2SpawnerGui then getgenv().MM2SpawnerGui:Destroy() end
-    end)
-end
-getgenv().MM2SpawnerLoaded = true
-
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
---// 1. Load mesh data (same source as your original script)
 if not isfile("mm2data.lua") then
     local result = request({
         Url = "https://raw.githubusercontent.com/Lutosys/opensrc/refs/heads/main/mm2meshes.lua",
@@ -24,613 +11,279 @@ if not isfile("mm2data.lua") then
     end
 end
 
-local data = loadfile("mm2data.lua")() or nil
+data = loadfile("mm2data.lua")() or nil
 if not data then
-    return warn("[MM2 GUI] failed to load mm2data.lua")
+    return warn("failed to load data")
 end
 
---// 2. Mesh helpers (from your script)
 local function findMeshAndTexture(node)
     if not node or type(node) ~= "table" then return nil end
+
     local props = node.Props
     if props then
         local meshId = props.MeshId or props.MeshID
         if meshId and meshId ~= "" then
             local textureId = props.TextureId or props.TextureID or ""
-            local scale = props.Scale or Vector3.new(0.045, 0.045, 0.045)
-            local size = props.Size or Vector3.new(0.045, 0.045, 0.045)
-            return { meshid = meshId, textureid = textureId, scale = scale, size = size }
+            local scale = props.Scale or Vector3.new(0.045,0.045,0.045)
+            local size = props.Size or Vector3.new(0.045,0.045,0.045)
+            return {
+                meshid = meshId,
+                textureid = textureId,
+                scale = scale,
+                size = size
+            }
         end
     end
+
     if node.Display and type(node.Display) == "table" then
         for _, child in ipairs(node.Display) do
             local res = findMeshAndTexture(child)
             if res then return res end
         end
     end
+
     return nil
 end
 
 local function getWeaponData(name)
     local weaponData = data[name]
-    if not weaponData then return nil end
-    return findMeshAndTexture(weaponData)
+    if not weaponData then
+        return nil
+    end
+
+    local found = findMeshAndTexture(weaponData)
+    if found then
+        return found
+    end
+
+    return nil
 end
 
---// Gingerscope fix: Meshes.txt RelCF is ignored by loader, so force flip here
+-- Ginger rotate fix
 if not _G.GingerOrig then _G.GingerOrig = {} end
 local GINGER_ID = "15374602183"
-local GINGER_FLIP = CFrame.Angles(math.rad(180), 0, 0) -- 180 X: muzzle down
--- for horizontal like pic 2, try instead: CFrame.Angles(math.rad(90), 0, 0)
+local GINGER_FLIP = CFrame.Angles(math.rad(180), 0, 0) -- 180 X = muzzle down
+-- for horizontal like pic 2, use: CFrame.Angles(math.rad(90), 0, 0)
 
-local function applyWeaponMesh(refPart, weaponData, weapontype)
-    if not weaponData or not weaponData.meshid then return end
-    if not refPart or not refPart.Parent then return end
+local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
+    if not weaponData then
+        return
+    end
+    if not weaponData.meshid then
+        return
+    end
 
     local isGinger = weaponData.meshid:find(GINGER_ID) ~= nil
 
-    -- Grip fixes for guns (held in hand)
-    if weapontype == "Gun" then
-        local tool = refPart:FindFirstAncestorOfClass("Tool")
-        if tool then
-            pcall(function()
-                if isGinger then
-                    tool.Grip = CFrame.fromMatrix(
-                        Vector3.new(0, -0.5, 0.7),
-                        Vector3.new(1, 0, 0),
-                        Vector3.new(0, -1, 0),
-                        Vector3.new(0, 0, -1)
-                    )
-                elseif weaponData.meshid:find("79401392") then
-                    tool.Grip = CFrame.fromMatrix(
-                        Vector3.new(0, -0.699999988, -0.300000012),
-                        Vector3.new(1, 0, 0),
-                        Vector3.new(0, 0, 1),
-                        Vector3.new(0, -1, 0)
-                    )
-                elseif weaponData.meshid:find("6600918074") then
-                    tool.Grip = CFrame.new(1, -0.359999988, 0.00000012, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-                else
-                    tool.Grip = CFrame.fromMatrix(
-                        Vector3.new(0, -0.5, 0.7),
-                        Vector3.new(1, 0, 0),
-                        Vector3.new(0, 1, 0),
-                        Vector3.new(0, 0, 1)
-                    )
-                end
-            end)
-        end
-    end
-
-    -- Hip DisplayRef fix (what pic 1 shows - NOT in a Tool, so Grip is skipped)
-    if isGinger and refPart:IsA("BasePart") then
-        local isDisplay = refPart:FindFirstAncestorOfClass("Tool") == nil
-        if isDisplay then
-            pcall(function()
-                local joint = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
-                if not joint and refPart.Parent then
-                    for _, c in ipairs(refPart.Parent:GetChildren()) do
-                        if (c:IsA("Motor6D") or c:IsA("Weld")) and (c.Part0 == refPart or c.Part1 == refPart) then
-                            joint = c
-                            break
+    if isGinger then
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.5, 0.7),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, -1, 0),
+                    Vector3.new(0, 0, -1)
+                )
+            end
+        else
+            -- DisplayRefGun hip visual (called without weapontype) - flip weld
+            if refPart:IsA("BasePart") and refPart:FindFirstAncestorOfClass("Tool") == nil then
+                pcall(function()
+                    local joint = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
+                    if not joint and refPart.Parent then
+                        for _, c in ipairs(refPart.Parent:GetChildren()) do
+                            if (c:IsA("Motor6D") or c:IsA("Weld")) and (c.Part0 == refPart or c.Part1 == refPart) then
+                                joint = c
+                                break
+                            end
                         end
                     end
-                end
-                if joint then
-                    if not _G.GingerOrig[joint] then
-                        _G.GingerOrig[joint] = joint.C0
+                    if joint then
+                        if not _G.GingerOrig[joint] then
+                            _G.GingerOrig[joint] = joint.C0
+                        end
+                        joint.C0 = _G.GingerOrig[joint] * GINGER_FLIP
                     end
-                    joint.C0 = _G.GingerOrig[joint] * GINGER_FLIP
+                end)
+            end
+        end
+    elseif weaponData.meshid:find("79401392") then
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.699999988, -0.300000012),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, 0, 1),
+                    Vector3.new(0, -1, 0)
+                )
+            end
+        end
+    elseif weaponData.meshid:find("6600918074") then
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.new(1, -0.359999988, 0.00000012, 0, 0, 1, 0, 1, 0, -1, 0, 0)
+            end
+        end
+    else
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.5, 0.7),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, 1, 0),
+                    Vector3.new(0, 0, 1)
+                )
+            end
+        end
+        -- restore hip weld for non-ginger guns
+        if refPart:IsA("BasePart") then
+            pcall(function()
+                local joint = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
+                if joint and _G.GingerOrig[joint] then
+                    joint.C0 = _G.GingerOrig[joint]
                 end
             end)
         end
     end
 
-    if not isGinger and refPart:IsA("BasePart") then
-        pcall(function()
-            local joint = refPart:FindFirstChildOfClass("Motor6D") or refPart:FindFirstChildOfClass("Weld")
-            if joint and _G.GingerOrig[joint] then
-                joint.C0 = _G.GingerOrig[joint]
-            end
-        end)
-    end
-
-    pcall(function()
-        if refPart:IsA("MeshPart") then
-            local sm = refPart:FindFirstChildOfClass("SpecialMesh")
-            if sm then sm:Destroy() end
-            refPart.Size = weaponData.size
-            refPart.MeshId = weaponData.meshid
-            refPart.TextureID = weaponData.textureid
-        else
-            local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
-            if not mesh then
-                mesh = Instance.new("SpecialMesh")
-                mesh.Name = "Mesh"
-                mesh.Parent = refPart
-            end
-            refPart.Size = weaponData.size
-            mesh.MeshId = weaponData.meshid
-            mesh.TextureId = weaponData.textureid
-            mesh.Scale = weaponData.scale
+    if refPart:IsA("MeshPart") then
+        local specialMesh = refPart:FindFirstChildOfClass("SpecialMesh")
+        if specialMesh then
+            specialMesh:Destroy()
         end
-    end)
+        refPart.Size = weaponData.size
+        refPart.MeshId = weaponData.meshid
+        refPart.TextureID = weaponData.textureid
+    else
+        local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
+        if not mesh then
+            mesh = Instance.new("SpecialMesh")
+            mesh.Name = "Mesh"
+            mesh.Parent = refPart
+        end
+        refPart.Size = weaponData.size
+        mesh.MeshId = weaponData.meshid
+        mesh.TextureId = weaponData.textureid
+        mesh.Scale = weaponData.scale
+    end
 end
 
---// 3. MM2 modules
 local InventoryModule = require(game.ReplicatedStorage.Modules.InventoryModule)
 local ProfileData = require(game.ReplicatedStorage.Modules.ProfileData)
 local Sync = require(game.ReplicatedStorage.Database.Sync)
 
--- Rarity colors for GUI
-local RarityColors = {
-    Common = Color3.fromRGB(180, 180, 180),
-    Uncommon = Color3.fromRGB(91, 202, 129),
-    Rare = Color3.fromRGB(91, 154, 232),
-    Epic = Color3.fromRGB(177, 91, 232),
-    Legendary = Color3.fromRGB(232, 168, 91),
-    Godly = Color3.fromRGB(232, 91, 91),
-    Ancient = Color3.fromRGB(240, 220, 100),
-    Unique = Color3.fromRGB(100, 240, 220),
-    Vintage = Color3.fromRGB(150, 150, 200),
-    Chroma = Color3.fromRGB(255, 100, 200),
-}
-
--- Guess weapon type (Knife vs Gun) from Sync entry
-local function guessType(name, itemData)
-    if itemData then
-        local t = itemData.ItemType or itemData.Type or itemData.WeaponType or itemData.Category
-        if t == "Knife" or t == "Gun" then return t end
-        if itemData.Gun == true then return "Gun" end
-        if itemData.Knife == true then return "Knife" end
-    end
-    if Sync.Guns and Sync.Guns[name] then return "Gun" end
-    if Sync.Knives and Sync.Knives[name] then return "Knife" end
-    return nil
-end
-
---// 4. Inventory spoof / refresh
-local function RefreshInventoryUI()
-    pcall(function()
-        local UpdateInventory = filtergc("table", { Keys = { "UpdateInventory" } }, true).UpdateInventory
-        if UpdateInventory then
-            for _, func in pairs(getgc()) do
-                if typeof(func) == "function" and islclosure(func) and debug.info(func, "l") == 122 and #debug.getupvalues(func) == 2 then
-                    pcall(UpdateInventory, debug.getupvalue(func, 2), InventoryModule.MyInventory)
-                    break
-                end
-            end
-        end
-    end)
-end
-
-local function UnlockWeapon(name)
-    local itemData = Sync.Weapons[name]
-    if not itemData then return false end
+for name, itemData in pairs(Sync.Weapons) do
     itemData.SortWithinGroup = itemData.SortWithinGroup or 0
     itemData.SortGroup = itemData.SortGroup or nil
     itemData.Name = itemData.Name or itemData.ItemName or name
     itemData.Rarity = itemData.Rarity or "Common"
-    ProfileData.Weapons.Owned[name] = 1
-    return true
-end
 
-local function UnlockAll(filterType)
-    local count = 0
-    for name, itemData in pairs(Sync.Weapons) do
-        local skip = false
-        if filterType then
-            local t = guessType(name, itemData)
-            if t and t ~= filterType then skip = true end
-            if t == nil and filterType ~= nil then
-            end
-        end
-        if not skip then
-            itemData.SortWithinGroup = itemData.SortWithinGroup or 0
-            itemData.Name = itemData.Name or itemData.ItemName or name
-            itemData.Rarity = itemData.Rarity or "Common"
-            if Sync.Rarities[itemData.Rarity] then
-                local info = getWeaponData(name)
-                if info and info.meshid then
-                    ProfileData.Weapons.Owned[name] = 1
-                    count += 1
-                end
-            end
+    if Sync.Rarities[itemData.Rarity] then
+        local weaponMeshInfo = getWeaponData(name)
+        if weaponMeshInfo and weaponMeshInfo.meshid and weaponMeshInfo.textureid and weaponMeshInfo.scale and weaponMeshInfo.size then
+            ProfileData.Weapons.Owned[name] = 1
         end
     end
-    RefreshInventoryUI()
-    return count
 end
 
-local function EquipWeapon(name, weapontype)
-    if not ProfileData.Weapons.Owned[name] then
-        UnlockWeapon(name)
-        RefreshInventoryUI()
+local UpdateInventory = filtergc("table", {Keys = {"UpdateInventory"}}, true).UpdateInventory
+for key, func in pairs(getgc()) do
+    if typeof(func) == "function" and islclosure(func) and debug.info(func, "l") == 122 and #debug.getupvalues(func) == 2 then
+        UpdateInventory(debug.getupvalue(func, 2), InventoryModule.MyInventory)
     end
-    pcall(function()
-        ProfileData.Weapons.Equipped[weapontype] = name
-    end)
-    RefreshInventoryUI()
 end
 
 local function isMurder()
     local success, result = pcall(function()
-        local char = LocalPlayer.Character
-        if not char then return false end
-        for _, v in pairs(char:GetChildren()) do
-            if v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then return true end
-        end
-        local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
-        if bp then
-            for _, v in pairs(bp:GetChildren()) do
-                if v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then return true end
+        for _, v in pairs(game.Players.LocalPlayer.Character:GetChildren()) do
+            if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
+                return true
             end
         end
+
+        for _, v in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+            if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
+                return true
+            end
+        end
+
         return false
     end)
-    return success and result
+
+    if success then
+        return result
+    end
+
+    return false
 end
 
--- StuckKnife (thrown knife) visual
 game.Workspace.ChildAdded:Connect(function(ch)
     if ch and ch:IsA("BasePart") and ch.Name == "StuckKnife" then
-        local mesh = ch:WaitForChild("Mesh", 3)
+        local mesh = ch:WaitForChild("Mesh")
         if mesh then
             local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
-            local knifedata = equippedKnifeName and getWeaponData(equippedKnifeName)
-            if knifedata and isMurder() then
-                pcall(function()
+            local knifedata = getWeaponData(equippedKnifeName)
+            if knifedata then
+                if isMurder() then
                     mesh.MeshId = knifedata.meshid
                     mesh.TextureId = knifedata.textureid
                     mesh.Scale = knifedata.scale
-                end)
+                end
             end
         end
     end
 end)
 
---// 5. Visual applier loop (held + SIDE hip visuals)
-getgenv().MM2SideVisuals = true
-task.spawn(function()
-    while task.wait(0.25) do
-        if not getgenv().MM2SideVisuals then continue end
-        local char = LocalPlayer.Character
-        if not char then continue end
+while wait() do
+    local char = game.Players.LocalPlayer.Character
+    if char then
         local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
         local equippedGunName = ProfileData.Weapons.Equipped.Gun
-        pcall(function()
-            -- Held tools
-            for _, tool in pairs(char:GetChildren()) do
-                if tool and tool:IsA("Tool") then
-                    local itemType = tool:GetAttribute("ItemType")
-                    local Handle = tool:FindFirstChild("Handle")
-                    if Handle then
-                        if itemType == "Knife" and equippedKnifeName then
-                            local kd = getWeaponData(equippedKnifeName)
-                            if kd then applyWeaponMesh(Handle, kd, "Knife") end
-                        elseif itemType == "Gun" and equippedGunName then
-                            local gd = getWeaponData(equippedGunName)
-                            if gd then applyWeaponMesh(Handle, gd, "Gun") end
+
+        for _, tool in pairs(char:GetChildren()) do
+            if tool and tool:IsA("Tool") then
+                local itemType = tool:GetAttribute("ItemType")
+                local Handle = tool:FindFirstChild("Handle")
+                if Handle then
+                    if itemType == "Knife" and equippedKnifeName then
+                        local knifedata = getWeaponData(equippedKnifeName)
+                        if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
+                            applyWeaponMesh(Handle, knifedata, equippedKnifeName, "Knife")
+                        end
+                    elseif itemType == "Gun" and equippedGunName then
+                        local gundata = getWeaponData(equippedGunName)
+                        if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
+                            applyWeaponMesh(Handle, gundata, equippedGunName, "Gun")
                         end
                     end
                 end
             end
-            -- SIDE visuals (hip). These are what show on your sides visually.
-            local refKnife = char:FindFirstChild("DisplayRefKnife")
-            if refKnife and refKnife.Value and equippedKnifeName then
-                local kd = getWeaponData(equippedKnifeName)
-                if kd then applyWeaponMesh(refKnife.Value, kd, "Knife") end
+        end
+
+        local DisplayRefGun = char:FindFirstChild("DisplayRefGun")
+        if DisplayRefGun then
+            local refVal = DisplayRefGun.Value
+            if refVal and typeof(refVal) == "Instance" and equippedGunName then
+                local gundata = getWeaponData(equippedGunName)
+                if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
+                    applyWeaponMesh(refVal, gundata, equippedGunName)
+                end
             end
-            local refGun = char:FindFirstChild("DisplayRefGun")
-            if refGun and refGun.Value and equippedGunName then
-                local gd = getWeaponData(equippedGunName)
-                if gd then applyWeaponMesh(refGun.Value, gd, "Gun") end
+        end
+
+        local DisplayRefKnife = char:FindFirstChild("DisplayRefKnife")
+        if DisplayRefKnife then
+            local refVal = DisplayRefKnife.Value
+            if refVal and typeof(refVal) == "Instance" and equippedKnifeName then
+                local knifedata = getWeaponData(equippedKnifeName)
+                if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
+                    applyWeaponMesh(refVal, knifedata, equippedKnifeName)
+                end
             end
-        end)
-    end
-end)
-
---// 6. GUI
-local parentGui = gethui and gethui() or game:GetService("CoreGui")
-pcall(function()
-    local old = parentGui:FindFirstChild("MM2SpawnerGUI")
-    if old then old:Destroy() end
-end)
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "MM2SpawnerGUI"
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.Parent = parentGui
-getgenv().MM2SpawnerGui = gui
-
-local main = Instance.new("Frame")
-main.Name = "Main"
-main.Size = UDim2.new(0, 520, 0, 430)
-main.Position = UDim2.new(0.5, -260, 0.5, -215)
-main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-main.BorderSizePixel = 0
-main.Active = true
-main.Draggable = true
-main.Parent = gui
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
-local stroke = Instance.new("UIStroke", main)
-stroke.Color = Color3.fromRGB(80, 80, 120)
-stroke.Thickness = 1.5
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -70, 0, 36)
-title.Position = UDim2.new(0, 12, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "MM2 Inventory Spawner  •  Side Visuals ON"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 15
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = main
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 28, 0, 28)
-closeBtn.Position = UDim2.new(1, -34, 0, 4)
-closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 14
-closeBtn.TextColor3 = Color3.white
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-closeBtn.Parent = main
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
-closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
-
-local minBtn = Instance.new("TextButton")
-minBtn.Size = UDim2.new(0, 28, 0, 28)
-minBtn.Position = UDim2.new(1, -66, 0, 4)
-minBtn.Text = "-"
-minBtn.Font = Enum.Font.GothamBold
-minBtn.TextSize = 16
-minBtn.TextColor3 = Color3.white
-minBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-minBtn.Parent = main
-Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
-
-local body = Instance.new("Frame")
-body.Name = "Body"
-body.Size = UDim2.new(1, -16, 1, -44)
-body.Position = UDim2.new(0, 8, 0, 38)
-body.BackgroundTransparency = 1
-body.Parent = main
-
-local minimized = false
-minBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    body.Visible = not minimized
-    main.Size = minimized and UDim2.new(0, 520, 0, 38) or UDim2.new(0, 520, 0, 430)
-end)
-
--- Search
-local search = Instance.new("TextBox")
-search.Size = UDim2.new(1, 0, 0, 30)
-search.PlaceholderText = "Search items... (e.g. Chroma, Icewing, Godly)"
-search.Text = ""
-search.Font = Enum.Font.Gotham
-search.TextSize = 14
-search.TextColor3 = Color3.white
-search.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-search.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-search.Parent = body
-Instance.new("UICorner", search).CornerRadius = UDim.new(0, 6)
-
--- Filter row
-local filterRow = Instance.new("Frame")
-filterRow.Size = UDim2.new(1, 0, 0, 30)
-filterRow.Position = UDim2.new(0, 0, 0, 36)
-filterRow.BackgroundTransparency = 1
-filterRow.Parent = body
-
-local function makeBtn(text, x, w, color)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(0, w, 1, 0)
-    b.Position = UDim2.new(0, x, 0, 0)
-    b.Text = text
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 12
-    b.TextColor3 = Color3.white
-    b.BackgroundColor3 = color
-    b.Parent = filterRow
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-    return b
-end
-
-local filterMode = "All"
-local status
-local refreshList
-local updateStatus
-local btnAll = makeBtn("All", 0, 60, Color3.fromRGB(70, 130, 200))
-local btnKnives = makeBtn("Knives", 66, 70, Color3.fromRGB(50, 50, 65))
-local btnGuns = makeBtn("Guns", 142, 70, Color3.fromRGB(50, 50, 65))
-local btnUnlockAll = makeBtn("Unlock All", 218, 90, Color3.fromRGB(60, 160, 90))
-local btnVisuals = makeBtn("Visuals: ON", 314, 95, Color3.fromRGB(140, 90, 200))
-
-local function setFilter(m)
-    filterMode = m
-    btnAll.BackgroundColor3 = m == "All" and Color3.fromRGB(70, 130, 200) or Color3.fromRGB(50, 50, 65)
-    btnKnives.BackgroundColor3 = m == "Knife" and Color3.fromRGB(70, 130, 200) or Color3.fromRGB(50, 50, 65)
-    btnGuns.BackgroundColor3 = m == "Gun" and Color3.fromRGB(70, 130, 200) or Color3.fromRGB(50, 50, 65)
-end
-btnAll.MouseButton1Click:Connect(function() setFilter("All"); refreshList() end)
-btnKnives.MouseButton1Click:Connect(function() setFilter("Knife"); refreshList() end)
-btnGuns.MouseButton1Click:Connect(function() setFilter("Gun"); refreshList() end)
-
-btnUnlockAll.MouseButton1Click:Connect(function()
-    btnUnlockAll.Text = "..."
-    task.spawn(function()
-        local c = UnlockAll(nil)
-        btnUnlockAll.Text = "Unlock All (" .. c .. ")"
-        status.Text = "Unlocked " .. c .. " items. Open inventory to equip, or Equip below."
-        task.wait(2)
-        btnUnlockAll.Text = "Unlock All"
-        refreshList()
-    end)
-end)
-
-btnVisuals.MouseButton1Click:Connect(function()
-    getgenv().MM2SideVisuals = not getgenv().MM2SideVisuals
-    btnVisuals.Text = getgenv().MM2SideVisuals and "Visuals: ON" or "Visuals: OFF"
-    btnVisuals.BackgroundColor3 = getgenv().MM2SideVisuals and Color3.fromRGB(140, 90, 200) or Color3.fromRGB(80, 80, 80)
-    title.Text = getgenv().MM2SideVisuals and "MM2 Inventory Spawner  •  Side Visuals ON" or "MM2 Inventory Spawner  •  Side Visuals OFF"
-end)
-
--- Status
-status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, 0, 0, 22)
-status.Position = UDim2.new(0, 0, 0, 70)
-status.BackgroundTransparency = 1
-status.Font = Enum.Font.Gotham
-status.TextSize = 12
-status.TextColor3 = Color3.fromRGB(200, 255, 200)
-status.TextXAlignment = Enum.TextXAlignment.Left
-status.TextTruncate = Enum.TextTruncate.AtEnd
-status.Parent = body
-
-updateStatus = function()
-    local k = ProfileData.Weapons.Equipped.Knife or "none"
-    local g = ProfileData.Weapons.Equipped.Gun or "none"
-    status.Text = "Equipped Knife " .. tostring(k) .. " | Gun " .. tostring(g)
-end
-
--- List
-local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, 0, 1, -96)
-scroll.Position = UDim2.new(0, 0, 0, 94)
-scroll.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
-scroll.BorderSizePixel = 0
-scroll.ScrollBarThickness = 6
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-scroll.Parent = body
-Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 6)
-local layout = Instance.new("UIListLayout", scroll)
-layout.Padding = UDim.new(0, 4)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-
--- Collect names
-local allNames = {}
-for name, _ in pairs(Sync.Weapons) do table.insert(allNames, name) end
-table.sort(allNames)
-
-refreshList = function()
-    for _, c in pairs(scroll:GetChildren()) do
-        if c:IsA("Frame") then c:Destroy() end
-    end
-    local q = string.lower(search.Text or "")
-    local shown = 0
-    local MAX_SHOW = 150
-    for _, name in ipairs(allNames) do
-        if shown >= MAX_SHOW then break end
-        local itemData = Sync.Weapons[name]
-        if itemData then
-            local t = guessType(name, itemData)
-            if filterMode ~= "All" and t ~= nil and t ~= filterMode then
-                continue
-            end
-            if q ~= "" and not string.find(string.lower(name), q, 1, true) then
-                continue
-            end
-            local info = getWeaponData(name)
-            if not info then continue end
-
-            local owned = ProfileData.Weapons.Owned[name] ~= nil
-            local rarity = itemData.Rarity or "Common"
-            local rcol = RarityColors[rarity] or Color3.white
-
-            local row = Instance.new("Frame")
-            row.Size = UDim2.new(1, -8, 0, 34)
-            row.BackgroundColor3 = Color3.fromRGB(36, 36, 48)
-            row.BorderSizePixel = 0
-            row.LayoutOrder = shown
-            row.Parent = scroll
-            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
-
-            local dot = Instance.new("Frame")
-            dot.Size = UDim2.new(0, 8, 0, 8)
-            dot.Position = UDim2.new(0, 8, 0.5, -4)
-            dot.BackgroundColor3 = rcol
-            dot.BorderSizePixel = 0
-            dot.Parent = row
-            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-
-            local lbl = Instance.new("TextLabel")
-            lbl.Size = UDim2.new(1, -190, 1, 0)
-            lbl.Position = UDim2.new(0, 22, 0, 0)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 12
-            lbl.TextColor3 = owned and Color3.fromRGB(140, 255, 140) or Color3.white
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.TextTruncate = Enum.TextTruncate.AtEnd
-            lbl.Text = (owned and "● " or "○ ") .. name .. " [" .. rarity .. "]"
-            lbl.Parent = row
-
-            local function smallBtn(txt, xoff, col)
-                local b = Instance.new("TextButton")
-                b.Size = UDim2.new(0, 52, 0, 24)
-                b.Position = UDim2.new(1, xoff, 0.5, -12)
-                b.Text = txt
-                b.Font = Enum.Font.GothamBold
-                b.TextSize = 11
-                b.TextColor3 = Color3.white
-                b.BackgroundColor3 = col
-                b.Parent = row
-                Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
-                return b
-            end
-
-            local bGet = smallBtn(owned and "Owned" or "Get", -168, owned and Color3.fromRGB(60, 90, 60) or Color3.fromRGB(60, 160, 90))
-            local bKnife = smallBtn("Knife", -110, Color3.fromRGB(200, 90, 60))
-            local bGun = smallBtn("Gun", -52, Color3.fromRGB(70, 130, 200))
-
-            bGet.MouseButton1Click:Connect(function()
-                UnlockWeapon(name)
-                RefreshInventoryUI()
-                updateStatus()
-                bGet.Text = "Owned"
-                bGet.BackgroundColor3 = Color3.fromRGB(60, 90, 60)
-                lbl.TextColor3 = Color3.fromRGB(140, 255, 140)
-                lbl.Text = "● " .. name .. " [" .. rarity .. "]"
-            end)
-            bKnife.MouseButton1Click:Connect(function()
-                EquipWeapon(name, "Knife")
-                updateStatus()
-                status.Text = "Equipped Knife: " .. name .. " (side + hand visual applied)"
-            end)
-            bGun.MouseButton1Click:Connect(function()
-                EquipWeapon(name, "Gun")
-                updateStatus()
-                status.Text = "Equipped Gun: " .. name .. " (side + hand visual applied)"
-            end)
-
-            shown += 1
         end
     end
-    if shown == 0 then
-        local l = Instance.new("TextLabel")
-        l.Size = UDim2.new(1, 0, 0, 30)
-        l.BackgroundTransparency = 1
-        l.Text = "No items found. Try a different search."
-        l.TextColor3 = Color3.fromRGB(180, 180, 180)
-        l.Font = Enum.Font.Gotham
-        l.TextSize = 13
-        l.Parent = scroll
-    elseif shown >= MAX_SHOW then
-        status.Text = "Showing first " .. MAX_SHOW .. " matches — refine search to find more."
-    else
-        updateStatus()
-    end
 end
-
-search:GetPropertyChangedSignal("Text"):Connect(function()
-    task.defer(refreshList)
-end)
-
-updateStatus()
-refreshList()
-print("[MM2 GUI] Loaded. Items:", #allNames)
