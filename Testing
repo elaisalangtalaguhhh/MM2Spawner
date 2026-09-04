@@ -83,6 +83,7 @@ end
 
 local GINGER_ID = "15374602183"
 local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size, others untouched
+local OTHER_SCALE = 0.8 -- every other gun/sword, hip+held, a little smaller
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
@@ -103,7 +104,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                     if m0 then
                         if snap.MeshId then m0.MeshId = snap.MeshId end
                         if snap.TextureId then m0.TextureId = snap.TextureId end
-                        if snap.Scale then m0.Scale = snap.Scale end
+                        if snap.Scale then m0.Scale = snap.Scale * OTHER_SCALE end
                     end
                 end
             end
@@ -172,6 +173,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
         if isGinger and isDisplay then _G.GingerHipLocked[refPart] = true end
+        if not isGinger then refPart.Size = weaponData.size * OTHER_SCALE end
     else
         local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
         if not mesh then
@@ -200,7 +202,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 if snap then
                     if snap.MeshId then mesh.MeshId = snap.MeshId end
                     if snap.TextureId then mesh.TextureId = snap.TextureId end
-                    if snap.Scale then mesh.Scale = snap.Scale end
+                    if snap.Scale then mesh.Scale = snap.Scale * OTHER_SCALE end
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
@@ -211,12 +213,13 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 if snap2 then
                     if snap2.MeshId then mesh.MeshId = snap2.MeshId end
                     if snap2.TextureId then mesh.TextureId = snap2.TextureId end
-                    if snap2.Scale then mesh.Scale = snap2.Scale end
+                    if snap2.Scale then mesh.Scale = snap2.Scale * OTHER_SCALE end
                 end
                 return
             end
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
+            mesh.Scale = weaponData.scale * OTHER_SCALE
         end
     end
 end
