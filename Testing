@@ -115,7 +115,20 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     end
     local isGinger = weaponData.meshid:find(GINGER_ID) ~= nil
 
-    if isGinger and isDisplay and _G.GingerHipLocked[refPart] then return end
+    if isGinger and isDisplay and _G.GingerHipLocked[refPart] then
+        -- Validate lock: game resets preview meshes on spawn/refresh. Re-apply if lost.
+        local stillFlipped = false
+        if refPart:IsA("MeshPart") then
+            stillFlipped = (refPart.MeshId == weaponData.meshid)
+        else
+            local m = refPart:FindFirstChildOfClass("SpecialMesh")
+            stillFlipped = m and (m.MeshId == weaponData.meshid)
+                and m.Scale.X > 0 and m.Scale.Y < 0 and m.Scale.Z < 0
+                or false
+        end
+        if stillFlipped then return end
+        _G.GingerHipLocked[refPart] = nil
+    end
 
     -- ORIGINAL Grip logic untouched (hand default).
     if weaponData.meshid:find("79401392") then
