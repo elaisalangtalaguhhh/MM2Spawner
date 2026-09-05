@@ -155,14 +155,8 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         restoreSB(refPart)
     end
 
-    -- ORIGINAL Grip logic untouched (hand default), plus SB hand yaw (Grip moves tool only).
-    local sbHand = (weapontype == "Gun") and (weaponData.meshid:find("12322809632") or weaponData.meshid:find("109742397574153"))
-    if sbHand then
-        local tool = refPart:FindFirstAncestorOfClass("Tool")
-        if tool then
-            tool.Grip = CFrame.new(Vector3.new(0,-0.5,0.7)) * CFrame.Angles(0,math.rad(90),0)
-        end
-    elseif weaponData.meshid:find("79401392") then
+    -- ORIGINAL Grip logic untouched (hand default).
+    if weaponData.meshid:find("79401392") then
         if weapontype == "Gun" then
             local tool = refPart:FindFirstAncestorOfClass("Tool")
             if tool then
