@@ -116,6 +116,23 @@ local function manageGingerAnim(char)
     end
     local track, oldTool, oldHum = _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum
     if heldTool and hum then
+        if _G.GingerAnimCool and os.clock() < _G.GingerAnimCool then return end
+        -- Verify last attempt actually took (engine can refuse async after Play).
+        if _G.GingerAnimCheck and track and oldTool == heldTool and oldHum == hum then
+            local okAlive, playing = pcall(function() return track.IsPlaying end)
+            local okLen, len = pcall(function() return track.Length end)
+            if okAlive and not playing then
+                gingerAnimLog("engine refused the asset (0s long track = blocked asset). Cooldown 60s.")
+                _G.GingerAnimCool = os.clock() + 60
+                _G.GingerAnimCheck = nil
+                pcall(function() track:Stop() end)
+                _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
+                return
+            elseif okLen then
+                gingerAnimLog("confirmed playing, length " .. tostring(len))
+            end
+            _G.GingerAnimCheck = nil
+        end
         local alive = false
         if track and oldTool == heldTool and oldHum == hum then
             alive = pcall(function() return track.IsPlaying end) and track.IsPlaying
@@ -138,15 +155,18 @@ local function manageGingerAnim(char)
                         gingerAnimLog("playing, rig=" .. tostring(hum.RigType))
                         _G.GingerAnimState = "playing"
                     end
+                    _G.GingerAnimCheck = os.clock() + 2
                 else
                     gingerAnimLog("Play FAILED: " .. tostring(errPlay))
                     _G.GingerAnimState = "playfail"
+                    _G.GingerAnimCool = os.clock() + 15
                 end
                 _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = newTrack, heldTool, hum
             else
                 gingerAnimLog("LoadAnimation FAILED: " .. tostring(newTrack) .. " (asset/rig?)")
                 _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
                 _G.GingerAnimState = "loadfail"
+                _G.GingerAnimCool = os.clock() + 15
             end
             pcall(function() anim:Destroy() end)
         end
@@ -160,8 +180,11 @@ local function manageGingerAnim(char)
         end
         if track then pcall(function() track:Stop() end) end
         _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
+        _G.GingerAnimCool, _G.GingerAnimCheck = nil, nil
     end
 end
+
+getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
