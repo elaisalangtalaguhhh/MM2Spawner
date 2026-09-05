@@ -201,6 +201,18 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
                 _G.SBXBase[refPart] = nil
             end
+            if _G.SBJointOrig then
+                for j, c0 in pairs(_G.SBJointOrig) do
+                    if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                    _G.SBJointOrig[j] = nil
+                end
+            end
+            if _G.SBAttachOrig then
+                for a, cf in pairs(_G.SBAttachOrig) do
+                    if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                    if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+                end
+            end
             if _G.GingerHipLocked[refPart] then
                 local snap = _G.GingerMeshOrig[refPart]
                 if snap then
@@ -338,6 +350,18 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
                 _G.SBXBase[refPart] = nil
             end
+            if _G.SBJointOrig then
+                for j, c0 in pairs(_G.SBJointOrig) do
+                    if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                    _G.SBJointOrig[j] = nil
+                end
+            end
+            if _G.SBAttachOrig then
+                for a, cf in pairs(_G.SBAttachOrig) do
+                    if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                    if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+                end
+            end
             if (weaponData.kind or "FileMesh") ~= "FileMesh" then
                 return
             end
@@ -369,6 +393,30 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 if not tied then
                     if not _G.SBXBase[refPart] then _G.SBXBase[refPart] = refPart.CFrame end
                     refPart.CFrame = _G.SBXBase[refPart] * CFrame.Angles(math.rad(-45),0,0)
+                else
+                    -- Tied: item-side only, never character side. Safe C0 / own attachments.
+                    if not _G.SBJointOrig then _G.SBJointOrig = {} end
+                    if not _G.SBAttachOrig then _G.SBAttachOrig = {} end
+                    local moved = false
+                    local scopes = {refPart}
+                    if refPart.Parent then scopes[2] = refPart.Parent end
+                    for _, scope in ipairs(scopes) do
+                        for _, c in ipairs(scope:GetChildren()) do
+                            if (c:IsA("Motor6D") or c:IsA("Weld")) and c.Part1 == refPart then
+                                if not _G.SBJointOrig[c] then _G.SBJointOrig[c] = c.C0 end
+                                c.C0 = _G.SBJointOrig[c] * CFrame.Angles(math.rad(-45),0,0)
+                                moved = true
+                            end
+                        end
+                    end
+                    if not moved then
+                        for _, a in ipairs(refPart:GetChildren()) do
+                            if a:IsA("Attachment") then
+                                if not _G.SBAttachOrig[a] then _G.SBAttachOrig[a] = a.CFrame end
+                                a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(math.rad(-45),0,0)
+                            end
+                        end
+                    end
                 end
             else
                 mesh.Scale = weaponData.scale
