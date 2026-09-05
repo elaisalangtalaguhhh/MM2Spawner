@@ -115,7 +115,7 @@ local function clearSBGizmo(refPart)
 end
 -- RGB circular arrows (positive-rotation sense) on Sunrise/Blossom hip.
 local function drawSBGizmo(refPart)
-    -- arrows back on for adjustments
+    do return end -- gizmo removed per request; calls stay harmless
     if _G.SBGizmo[refPart] then return end
     local made = {}
     local function track(inst) table.insert(made, inst) return inst end
