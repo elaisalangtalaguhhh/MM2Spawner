@@ -329,7 +329,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         if not mesh then
             mesh = Instance.new("SpecialMesh")
             mesh.Name = "Mesh"
+            mesh.MeshType = Enum.MeshType.FileMesh
             mesh.Parent = refPart
+        elseif mesh.MeshType ~= Enum.MeshType.FileMesh then
+            mesh.MeshType = Enum.MeshType.FileMesh
         end
         if isGinger and isDisplay then
             if not _G.GingerMeshOrig[refPart] then
