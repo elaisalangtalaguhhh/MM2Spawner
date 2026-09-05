@@ -85,6 +85,27 @@ local GINGER_ID = "15374602183"
 local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size, others untouched
 local OTHER_SCALE = 1 -- every other gun/sword, hip+held, true size
 if not _G.SBBase then _G.SBBase = {} end
+if not _G.SBApplied then _G.SBApplied = {} end
+if not _G.SBJointOrig then _G.SBJointOrig = {} end
+if not _G.SBAttachOrig then _G.SBAttachOrig = {} end
+
+-- Undo Sunrise/Blossom yaw on a shared slot so later guns come back straight.
+local function restoreSB(refPart)
+    if not _G.SBApplied[refPart] then return end
+    if _G.SBBase[refPart] then
+        pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
+        _G.SBBase[refPart] = nil
+    end
+    for j, c0 in pairs(_G.SBJointOrig) do
+        if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+        _G.SBJointOrig[j] = nil
+    end
+    for a, cf in pairs(_G.SBAttachOrig) do
+        if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+        if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+    end
+    _G.SBApplied[refPart] = nil
+end
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
@@ -111,22 +132,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             end
             _G.GingerHipLocked[refPart] = nil
             _G.GingerMeshOrig[refPart] = nil
-            if _G.SBBase and _G.SBBase[refPart] then
-                pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
-                _G.SBBase[refPart] = nil
-            end
-            if _G.SBJointOrig then
-                for j, c0 in pairs(_G.SBJointOrig) do
-                    if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
-                    _G.SBJointOrig[j] = nil
-                end
-            end
-            if _G.SBAttachOrig then
-                for a, cf in pairs(_G.SBAttachOrig) do
-                    if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
-                    if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
-                end
-            end
+            restoreSB(refPart)
         end
         return
     end
@@ -201,15 +207,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
-                if _G.SBBase and _G.SBBase[refPart] then
-                    pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
-                    _G.SBBase[refPart] = nil
-                end
-                if _G.SBAttachOrig then
-                    for a, _ in pairs(_G.SBAttachOrig) do
-                        if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
-                    end
-                end
+                restoreSB(refPart)
             end
             if (weaponData.kind or "FileMesh") ~= "MeshPart" then return end
         end
@@ -251,22 +249,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
-                if _G.SBBase and _G.SBBase[refPart] then
-                    pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
-                    _G.SBBase[refPart] = nil
-                end
-                if _G.SBJointOrig then
-                    for j, c0 in pairs(_G.SBJointOrig) do
-                        if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
-                        _G.SBJointOrig[j] = nil
-                    end
-                end
-                if _G.SBAttachOrig then
-                    for a, cf in pairs(_G.SBAttachOrig) do
-                        if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
-                        if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
-                    end
-                end
+                restoreSB(refPart)
             end
             if (weaponData.kind or "FileMesh") ~= "FileMesh" then
                 -- cross-type new MeshPart gun in old Part slot: restore default look instead of giant
@@ -314,14 +297,12 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                     end
                 end
                 if not tied then
-                    if not _G.SBBase then _G.SBBase = {} end
-                    if not _G.SBBase[refPart] then _G.SBBase[refPart] = refPart.CFrame end
+                    _G.SBBase[refPart] = _G.SBBase[refPart] or refPart.CFrame
                     refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(0,math.rad(90),0)
+                    _G.SBApplied[refPart] = true
                 else
                     -- Tied: rotate item-side only. Motor/Weld C0 when display is Part1,
                     -- else own Attachments. Never touches character side.
-                    if not _G.SBJointOrig then _G.SBJointOrig = {} end
-                    if not _G.SBAttachOrig then _G.SBAttachOrig = {} end
                     local moved = false
                     local function tryJoint(inst)
                         if (inst:IsA("Motor6D") or inst:IsA("Weld")) and inst.Part1 == refPart then
@@ -339,9 +320,11 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                             if a:IsA("Attachment") then
                                 if not _G.SBAttachOrig[a] then _G.SBAttachOrig[a] = a.CFrame end
                                 a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(0,math.rad(90),0)
+                                moved = true
                             end
                         end
                     end
+                    if moved then _G.SBApplied[refPart] = true end
                 end
             else
                 mesh.Scale = weaponData.scale * OTHER_SCALE
