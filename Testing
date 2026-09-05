@@ -90,6 +90,13 @@ getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
 if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
+-- Purge blank snapshots saved while slots were still empty (they restore as invisible).
+for ref, snap in pairs(_G.GingerMeshOrig) do
+    if type(snap) ~= "table" or not snap.MeshId or snap.MeshId == "" then
+        _G.GingerMeshOrig[ref] = nil
+        _G.GingerHipLocked[ref] = nil
+    end
+end
 if not _G.SBXBase then _G.SBXBase = {} end
 if not _G.SBGizmo then _G.SBGizmo = {} end
 -- One-time sweep: destroy gizmo parts left by previous runs (visual-only, safe).
@@ -328,7 +335,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     end
 
     if refPart:IsA("MeshPart") then
-        if (isGinger or isSB) and isDisplay and not _G.GingerMeshOrig[refPart] then
+        if (isGinger or isSB) and isDisplay and not _G.GingerMeshOrig[refPart] and refPart.MeshId ~= "" then
             _G.GingerMeshOrig[refPart] = {MeshId = refPart.MeshId, TextureID = refPart.TextureID}
         end
         if not isGinger and not isSB then
@@ -366,7 +373,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
         refPart.Transparency = 0
         if isGinger and isDisplay then
-            if not _G.GingerMeshOrig[refPart] then
+            if not _G.GingerMeshOrig[refPart] and mesh.MeshId ~= "" then
                 _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
             end
             -- Front-back single-axis per request + tilt -45 below.
@@ -478,7 +485,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
             if isSB and isDisplay then
-                if not _G.GingerMeshOrig[refPart] then
+                if not _G.GingerMeshOrig[refPart] and mesh.MeshId ~= "" then
                     _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
                 end
                 local s0 = weaponData.scale
