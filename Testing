@@ -208,6 +208,26 @@ local function drawSBGizmo(refPart)
 end
 -- ===== GIZMO TEMP END =====
 
+-- Undo Sunrise/Blossom yaw on a shared slot so later guns come back straight.
+local function restoreSB(refPart)
+    if _G.SBXBase[refPart] then
+        pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
+        _G.SBXBase[refPart] = nil
+    end
+    if _G.SBJointOrig then
+        for j, c0 in pairs(_G.SBJointOrig) do
+            if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+            _G.SBJointOrig[j] = nil
+        end
+    end
+    if _G.SBAttachOrig then
+        for a, cf in pairs(_G.SBAttachOrig) do
+            if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+            if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+        end
+    end
+end
+
 local function isSBMesh(meshid)
     return (meshid:find(BLOSSOM_MESH) ~= nil) or (meshid:find(SUNRISE_MESH) ~= nil)
 end
