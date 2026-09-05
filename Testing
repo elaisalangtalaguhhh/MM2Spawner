@@ -352,7 +352,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             if not _G.GingerMeshOrig[refPart] then
                 _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
             end
-            -- Front-back + tilt -45. Mirror stays even-count (solid).
+            -- Front-back single-axis per request + tilt -45 below.
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
             mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
