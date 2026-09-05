@@ -92,6 +92,17 @@ if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
 if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
 if not _G.SBXBase then _G.SBXBase = {} end
 if not _G.SBGizmo then _G.SBGizmo = {} end
+-- One-time sweep: destroy gizmo parts left by previous runs (visual-only, safe).
+pcall(function()
+    local char = game.Players.LocalPlayer.Character
+    local scopes = {game.Workspace}
+    if char then table.insert(scopes, char) end
+    for _, scope in ipairs(scopes) do
+        for _, d in ipairs(scope:GetDescendants()) do
+            if d.Name:sub(1, 3) == "SBG" then pcall(function() d:Destroy() end) end
+        end
+    end
+end)
 
 -- ===== GIZMO TEMP (delete this whole block on next prompt) =====
 local function clearSBGizmo(refPart)
@@ -103,6 +114,7 @@ local function clearSBGizmo(refPart)
 end
 -- RGB circular arrows (positive-rotation sense) on Sunrise/Blossom hip.
 local function drawSBGizmo(refPart)
+    do return end -- gizmo removed, calls stay harmless
     if _G.SBGizmo[refPart] then return end
     local made = {}
     local function track(inst) table.insert(made, inst) return inst end
