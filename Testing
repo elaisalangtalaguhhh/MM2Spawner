@@ -100,49 +100,88 @@ local function clearSBGizmo(refPart)
     end
     _G.SBGizmo[refPart] = nil
 end
--- RGB world-axis arrows on Sunrise/Blossom hip so you can name the axis to turn.
+-- RGB circular arrows (positive-rotation sense) on Sunrise/Blossom hip.
 local function drawSBGizmo(refPart)
     if _G.SBGizmo[refPart] then return end
     local made = {}
-    local function axis(name, color, offset)
-        local a0 = Instance.new("Attachment")
-        a0.Name = "SBG0_" .. name
-        a0.CFrame = CFrame.new()
-        a0.Parent = refPart
-        local a1 = Instance.new("Attachment")
-        a1.Name = "SBG1_" .. name
-        a1.CFrame = CFrame.new(offset)
-        a1.Parent = refPart
-        local b = Instance.new("Beam")
-        b.Name = "SBGBeam_" .. name
-        b.Attachment0 = a0
-        b.Attachment1 = a1
-        b.Color = ColorSequence.new(color)
-        b.Width0 = 0.12
-        b.Width1 = 0.02
-        b.FaceCamera = false
-        b.LightEmission = 1
-        b.Parent = refPart
+    local function track(inst) table.insert(made, inst) return inst end
+    -- Circle in the plane normal to `axisVec`, arrowhead shows + direction.
+    local function axis(name, color, axisVec)
+        local r, n = 1.4, 12
+        local sweep = math.rad(270)
+        local u, v
+        if axisVec == "X" then
+            u, v = Vector3.new(0, 1, 0), Vector3.new(0, 0, 1)
+        elseif axisVec == "Y" then
+            u, v = Vector3.new(1, 0, 0), Vector3.new(0, 0, 1)
+        else
+            u, v = Vector3.new(1, 0, 0), Vector3.new(0, 1, 0)
+        end
+        local prev
+        for i = 0, n do
+            local a = sweep * (i / n)
+            local pos = u * (math.cos(a) * r) + v * (math.sin(a) * r)
+            local at = Instance.new("Attachment")
+            at.Name = "SBG" .. name .. i
+            at.CFrame = CFrame.new(pos)
+            at.Parent = refPart
+            track(at)
+            if prev then
+                local b = Instance.new("Beam")
+                b.Name = "SBGBeam_" .. name .. i
+                b.Attachment0 = prev
+                b.Attachment1 = at
+                b.Color = ColorSequence.new(color)
+                b.Width0 = 0.09
+                b.Width1 = 0.05
+                b.FaceCamera = false
+                b.LightEmission = 1
+                b.Parent = refPart
+                track(b)
+            end
+            prev = at
+        end
+        -- Head block at arc end, nose along travel direction.
+        local aEnd = sweep
+        local endPos = u * (math.cos(aEnd) * r) + v * (math.sin(aEnd) * r)
+        local tangent = v * math.cos(aEnd) - u * math.sin(aEnd)
+        local head = Instance.new("Part")
+        head.Name = "SBGHead_" .. name
+        head.Size = Vector3.new(0.22, 0.22, 0.55)
+        head.Color = color
+        head.Material = Enum.Material.Neon
+        head.CanCollide = false
+        head.CanQuery = false
+        head.CFrame = refPart.CFrame * CFrame.lookAt(endPos, endPos + tangent)
+        head.Parent = refPart
+        track(head)
+        local w = Instance.new("WeldConstraint")
+        w.Name = "SBGWeld_" .. name
+        w.Part0 = head
+        w.Part1 = refPart
+        w.Parent = head
+        track(w)
         local gui = Instance.new("BillboardGui")
         gui.Name = "SBGLbl_" .. name
-        gui.Size = UDim2.new(0, 40, 0, 40)
+        gui.Size = UDim2.new(0, 44, 0, 44)
         gui.AlwaysOnTop = true
-        gui.Adornee = a1
+        gui.StudsOffset = Vector3.new(0, 0.6, 0)
+        gui.Adornee = head
         gui.Parent = refPart
         local txt = Instance.new("TextLabel")
         txt.Size = UDim2.new(1, 0, 1, 0)
         txt.BackgroundTransparency = 1
-        txt.Text = name
+        txt.Text = name .. "+"
         txt.Font = Enum.Font.GothamBlack
-        txt.TextSize = 28
+        txt.TextSize = 26
         txt.TextColor3 = color
         txt.TextStrokeTransparency = 0
         txt.Parent = gui
-        for _, inst in ipairs({a0, a1, b, gui}) do table.insert(made, inst) end
+        track(gui)
     end
-    axis("X", Color3.fromRGB(255, 60, 60), Vector3.new(2, 0, 0))
-    axis("Y", Color3.fromRGB(60, 255, 60), Vector3.new(0, 2, 0))
-    axis("Z", Color3.fromRGB(80, 140, 255), Vector3.new(0, 0, 2))
+    axis("X", Color3.fromRGB(255, 60, 60), "X")
+    axis("Y", Color3.fromRGB(60, 255, 60), "Y")
+    axis("Z", Color3.fromRGB(80, 140, 255), "Z")
     _G.SBGizmo[refPart] = made
 end
 -- ===== GIZMO TEMP END =====
