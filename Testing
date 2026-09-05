@@ -103,6 +103,7 @@ pcall(function()
         end
     end
 end)
+_G.SBGizmo = {}
 
 -- ===== GIZMO TEMP (delete this whole block on next prompt) =====
 local function clearSBGizmo(refPart)
@@ -114,7 +115,7 @@ local function clearSBGizmo(refPart)
 end
 -- RGB circular arrows (positive-rotation sense) on Sunrise/Blossom hip.
 local function drawSBGizmo(refPart)
-    do return end -- gizmo removed, calls stay harmless
+    -- arrows back on for adjustments
     if _G.SBGizmo[refPart] then return end
     local made = {}
     local function track(inst) table.insert(made, inst) return inst end
@@ -257,7 +258,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         else
             local m = refPart:FindFirstChildOfClass("SpecialMesh")
             stillFlipped = m and (m.MeshId == weaponData.meshid)
-                and m.Scale.X < 0 and m.Scale.Y < 0 and m.Scale.Z > 0
+                and m.Scale.X < 0 and m.Scale.Y > 0 and m.Scale.Z < 0
                 or false
         end
         if stillFlipped then return end
@@ -343,8 +344,9 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             -- Proven flip+shrink. Scale only: cannot spin player.
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
-            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
+            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
             _G.GingerHipLocked[refPart] = true
+            drawSBGizmo(refPart)
         elseif isGinger and not isDisplay then
             -- Held Ginger: same tiny size as hip, positive default orientation.
             mesh.MeshId = weaponData.meshid
