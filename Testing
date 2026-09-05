@@ -297,7 +297,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 if not tied then
                     _G.SBBase[refPart] = _G.SBBase[refPart] or refPart.CFrame
-                    refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(0,math.rad(90),0)
+                    refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(0,math.rad(-90),0)
                     _G.SBApplied[refPart] = true
                 else
                     -- Tied: rotate item-side only. Motor/Weld C0 when display is Part1,
@@ -306,7 +306,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                     local function tryJoint(inst)
                         if (inst:IsA("Motor6D") or inst:IsA("Weld")) and inst.Part1 == refPart then
                             if not _G.SBJointOrig[inst] then _G.SBJointOrig[inst] = inst.C0 end
-                            inst.C0 = _G.SBJointOrig[inst] * CFrame.Angles(0,math.rad(90),0)
+                            inst.C0 = _G.SBJointOrig[inst] * CFrame.Angles(0,math.rad(-90),0)
                             moved = true
                         end
                     end
@@ -318,7 +318,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                         for _, a in ipairs(refPart:GetChildren()) do
                             if a:IsA("Attachment") then
                                 if not _G.SBAttachOrig[a] then _G.SBAttachOrig[a] = a.CFrame end
-                                a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(0,math.rad(90),0)
+                                a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(0,math.rad(-90),0)
                                 moved = true
                             end
                         end
