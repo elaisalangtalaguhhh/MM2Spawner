@@ -1,0 +1,638 @@
+-- testing.lua - clean build. Ginger hip locked flip. Sunrise/Blossom hip mirrors + axis gizmo.
+-- Everything else: game default behavior. Visual-only (others see defaults).
+
+if not isfile("mm2data.lua") then
+    local result = request({
+        Url = "https://raw.githubusercontent.com/Lutosys/opensrc/refs/heads/main/mm2meshes.lua",
+        Method = "GET",
+    })
+    if result.Success then
+        writefile("mm2data.lua", result.Body)
+    end
+end
+
+data = loadfile("mm2data.lua")() or nil
+if not data then
+    return warn("failed to load data")
+end
+
+local function findMeshAndTexture(node)
+    if not node or type(node) ~= "table" then return nil end
+    local props = node.Props
+    if props then
+        local meshId = props.MeshId or props.MeshID or props.SearchId or props.SearchID
+        if meshId and meshId ~= "" then
+            return {
+                meshid = meshId,
+                textureid = props.TextureId or props.TextureID or "",
+                scale = props.Scale or Vector3.new(1, 1, 1),
+                size = props.Size or Vector3.new(0.2697, 1.2582, 4.2087),
+                kind = props.Scale and "FileMesh" or "MeshPart"
+            }
+        end
+    end
+    if node.Display and type(node.Display) == "table" then
+        local partSize
+        for _, child in ipairs(node.Display) do
+            local p = child.Props
+            if p and p.Size then partSize = p.Size end
+        end
+        for _, child in ipairs(node.Display) do
+            local p = child.Props
+            if p then
+                local mid = p.MeshId or p.MeshID or p.SearchId or p.SearchID
+                if mid and mid ~= "" then
+                    return {
+                        meshid = mid,
+                        textureid = p.TextureId or p.TextureID or "",
+                        scale = p.Scale or Vector3.new(1, 1, 1),
+                        size = p.Size or partSize or Vector3.new(0.2697, 1.2582, 4.2087),
+                        kind = (child.Class == "MeshPart") and "MeshPart" or "FileMesh"
+                    }
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function normName(s)
+    s = tostring(s or ""):lower()
+    s = s:gsub("[%s%-%_]+", "")
+    return s
+end
+local DataIndex = {}
+for key, entry in pairs(data) do
+    if type(entry) == "table" then
+        DataIndex[normName(key)] = DataIndex[normName(key)] or key
+        local base = tostring(key):gsub("_G_%d+$", ""):gsub("_K_%d+$", ""):gsub("_%d+$", "")
+        DataIndex[normName(base)] = DataIndex[normName(base)] or key
+        if entry.Meta and entry.Meta.ItemName then
+            DataIndex[normName(entry.Meta.ItemName)] = DataIndex[normName(entry.Meta.ItemName)] or key
+        end
+    end
+end
+
+local function getWeaponData(name)
+    if not name then return nil end
+    if data[name] then return findMeshAndTexture(data[name]) end
+    local key = DataIndex[normName(name)]
+    if key and data[key] then return findMeshAndTexture(data[key]) end
+    return nil
+end
+
+local GINGER_ID = "15374602183"
+local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size
+local BLOSSOM_MESH = "12322809632"
+local SUNRISE_MESH = "109742397574153"
+
+getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
+local MY_RUN = getgenv().GingerRunId
+if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
+if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
+if not _G.SBXBase then _G.SBXBase = {} end
+if not _G.SBGizmo then _G.SBGizmo = {} end
+-- One-time sweep: destroy gizmo parts left by previous runs (visual-only, safe).
+pcall(function()
+    local char = game.Players.LocalPlayer.Character
+    local scopes = {game.Workspace}
+    if char then table.insert(scopes, char) end
+    for _, scope in ipairs(scopes) do
+        for _, d in ipairs(scope:GetDescendants()) do
+            if d.Name:sub(1, 3) == "SBG" then pcall(function() d:Destroy() end) end
+        end
+    end
+end)
+_G.SBGizmo = {}
+
+-- ===== GIZMO TEMP (delete this whole block on next prompt) =====
+local function clearSBGizmo(refPart)
+    local g = _G.SBGizmo[refPart]
+    if g then
+        for _, inst in ipairs(g) do pcall(function() inst:Destroy() end) end
+    end
+    _G.SBGizmo[refPart] = nil
+end
+-- RGB circular arrows (positive-rotation sense) on Sunrise/Blossom hip.
+local function drawSBGizmo(refPart)
+    -- arrows back on for adjustments
+    if _G.SBGizmo[refPart] then return end
+    local made = {}
+    local function track(inst) table.insert(made, inst) return inst end
+    -- Circle in the plane normal to `axisVec`, arrowhead shows + direction.
+    local function axis(name, color, axisVec)
+        local r, n = 1.4, 12
+        local sweep = math.rad(270)
+        local u, v
+        if axisVec == "X" then
+            u, v = Vector3.new(0, 1, 0), Vector3.new(0, 0, 1)
+        elseif axisVec == "Y" then
+            u, v = Vector3.new(1, 0, 0), Vector3.new(0, 0, 1)
+        else
+            u, v = Vector3.new(1, 0, 0), Vector3.new(0, 1, 0)
+        end
+        local prev
+        for i = 0, n do
+            local a = sweep * (i / n)
+            local pos = u * (math.cos(a) * r) + v * (math.sin(a) * r)
+            local at = Instance.new("Attachment")
+            at.Name = "SBG" .. name .. i
+            at.CFrame = CFrame.new(pos)
+            at.Parent = refPart
+            track(at)
+            if prev then
+                local b = Instance.new("Beam")
+                b.Name = "SBGBeam_" .. name .. i
+                b.Attachment0 = prev
+                b.Attachment1 = at
+                b.Color = ColorSequence.new(color)
+                b.Width0 = 0.09
+                b.Width1 = 0.05
+                b.FaceCamera = false
+                b.LightEmission = 1
+                b.Parent = refPart
+                track(b)
+            end
+            prev = at
+        end
+        -- Head block at arc end, nose along travel direction.
+        local aEnd = sweep
+        local endPos = u * (math.cos(aEnd) * r) + v * (math.sin(aEnd) * r)
+        local tangent = v * math.cos(aEnd) - u * math.sin(aEnd)
+        local head = Instance.new("Part")
+        head.Name = "SBGHead_" .. name
+        head.Size = Vector3.new(0.22, 0.22, 0.55)
+        head.Color = color
+        head.Material = Enum.Material.Neon
+        head.CanCollide = false
+        head.CanQuery = false
+        head.CFrame = refPart.CFrame * CFrame.lookAt(endPos, endPos + tangent)
+        head.Parent = refPart
+        track(head)
+        local w = Instance.new("WeldConstraint")
+        w.Name = "SBGWeld_" .. name
+        w.Part0 = head
+        w.Part1 = refPart
+        w.Parent = head
+        track(w)
+        local gui = Instance.new("BillboardGui")
+        gui.Name = "SBGLbl_" .. name
+        gui.Size = UDim2.new(0, 44, 0, 44)
+        gui.AlwaysOnTop = true
+        gui.StudsOffset = Vector3.new(0, 0.6, 0)
+        gui.Adornee = head
+        gui.Parent = refPart
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.Text = name .. "+"
+        txt.Font = Enum.Font.GothamBlack
+        txt.TextSize = 26
+        txt.TextColor3 = color
+        txt.TextStrokeTransparency = 0
+        txt.Parent = gui
+        track(gui)
+    end
+    axis("X", Color3.fromRGB(255, 60, 60), "X")
+    axis("Y", Color3.fromRGB(60, 255, 60), "Y")
+    axis("Z", Color3.fromRGB(80, 140, 255), "Z")
+    _G.SBGizmo[refPart] = made
+end
+-- ===== GIZMO TEMP END =====
+
+local function isSBMesh(meshid)
+    return (meshid:find(BLOSSOM_MESH) ~= nil) or (meshid:find(SUNRISE_MESH) ~= nil)
+end
+
+local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
+    local isDisplay = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
+    if not weaponData or not weaponData.meshid then
+        -- Unknown gun: clear our visuals so the slot shows game default.
+        if isDisplay then
+            clearSBGizmo(refPart)
+            if _G.SBXBase[refPart] then
+                pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
+                _G.SBXBase[refPart] = nil
+            end
+            if _G.SBJointOrig then
+                for j, c0 in pairs(_G.SBJointOrig) do
+                    if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                    _G.SBJointOrig[j] = nil
+                end
+            end
+            if _G.SBAttachOrig then
+                for a, cf in pairs(_G.SBAttachOrig) do
+                    if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                    if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+                end
+            end
+            if _G.GingerHipLocked[refPart] then
+                local snap = _G.GingerMeshOrig[refPart]
+                if snap then
+                    if refPart:IsA("MeshPart") then
+                        if snap.MeshId then refPart.MeshId = snap.MeshId end
+                        if snap.TextureID then refPart.TextureID = snap.TextureID end
+                    else
+                        local m0 = refPart:FindFirstChildOfClass("SpecialMesh")
+                        if m0 then
+                            if snap.MeshId then m0.MeshId = snap.MeshId end
+                            if snap.TextureId then m0.TextureId = snap.TextureId end
+                            if snap.Scale then m0.Scale = snap.Scale end
+                        end
+                    end
+                end
+                _G.GingerHipLocked[refPart] = nil
+                _G.GingerMeshOrig[refPart] = nil
+                if _G.GingerCF and _G.GingerCF[refPart] then
+                    pcall(function() refPart.CFrame = _G.GingerCF[refPart] end)
+                    _G.GingerCF[refPart] = nil
+                end
+                if _G.GingerJointOrig then
+                    for j, c0 in pairs(_G.GingerJointOrig) do
+                        if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                        _G.GingerJointOrig[j] = nil
+                    end
+                end
+                if _G.GingerAttachOrig then
+                    for a, cf in pairs(_G.GingerAttachOrig) do
+                        if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                        if a.Parent == refPart then _G.GingerAttachOrig[a] = nil end
+                    end
+                end
+            end
+        end
+        return
+    end
+    local isGinger = weaponData.meshid:find(GINGER_ID) ~= nil
+    local isSB = isSBMesh(weaponData.meshid)
+
+    if isGinger and isDisplay and _G.GingerHipLocked[refPart] then
+        -- Validate lock: game resets preview meshes on spawn/refresh. Re-apply if lost.
+        local stillFlipped = false
+        if refPart:IsA("MeshPart") then
+            stillFlipped = (refPart.MeshId == weaponData.meshid)
+        else
+            local m = refPart:FindFirstChildOfClass("SpecialMesh")
+            stillFlipped = m and (m.MeshId == weaponData.meshid)
+                and m.Scale.X < 0 and m.Scale.Y > 0 and m.Scale.Z > 0
+                or false
+        end
+        if stillFlipped then
+            if _G.GingerCF and _G.GingerCF[refPart] then
+                pcall(function()
+                    refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(-45),0,0)
+                end)
+            end
+            return
+        end
+        _G.GingerHipLocked[refPart] = nil
+    end
+
+    -- ORIGINAL Grip logic untouched (hand default for everything).
+    if weaponData.meshid:find("79401392") then
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.699999988, -0.300000012),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, 0, 1),
+                    Vector3.new(0, -1, 0)
+                )
+            end
+        end
+    elseif weaponData.meshid:find("6600918074") then
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.new(1, -0.359999988, 0.00000012, 0, 0, 1, 0, 1, 0, -1, 0, 0)
+            end
+        end
+    else
+        if weapontype == "Gun" then
+            local tool = refPart:FindFirstAncestorOfClass("Tool")
+            if tool then
+                tool.Grip = CFrame.fromMatrix(
+                    Vector3.new(0, -0.5, 0.7),
+                    Vector3.new(1, 0, 0),
+                    Vector3.new(0, 1, 0),
+                    Vector3.new(0, 0, 1)
+                )
+            end
+        end
+    end
+
+    if refPart:IsA("MeshPart") then
+        if (isGinger or isSB) and isDisplay and not _G.GingerMeshOrig[refPart] then
+            _G.GingerMeshOrig[refPart] = {MeshId = refPart.MeshId, TextureID = refPart.TextureID}
+        end
+        if not isGinger and not isSB then
+            if _G.GingerHipLocked[refPart] then
+                local snap = _G.GingerMeshOrig[refPart]
+                if snap then
+                    if snap.MeshId then refPart.MeshId = snap.MeshId end
+                    if snap.TextureID then refPart.TextureID = snap.TextureID end
+                end
+                _G.GingerHipLocked[refPart] = nil
+                _G.GingerMeshOrig[refPart] = nil
+            end
+            clearSBGizmo(refPart)
+            if _G.SBXBase[refPart] then
+                pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
+                _G.SBXBase[refPart] = nil
+            end
+            if (weaponData.kind or "FileMesh") ~= "MeshPart" then return end
+        end
+        local specialMesh = refPart:FindFirstChildOfClass("SpecialMesh")
+        if specialMesh then specialMesh:Destroy() end
+        refPart.Transparency = 0
+        refPart.MeshId = weaponData.meshid
+        refPart.TextureID = weaponData.textureid
+        if isGinger and isDisplay then _G.GingerHipLocked[refPart] = true end
+    else
+        local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
+        if not mesh then
+            mesh = Instance.new("SpecialMesh")
+            mesh.Name = "Mesh"
+            mesh.MeshType = Enum.MeshType.FileMesh
+            mesh.Parent = refPart
+        elseif mesh.MeshType ~= Enum.MeshType.FileMesh then
+            mesh.MeshType = Enum.MeshType.FileMesh
+        end
+        refPart.Transparency = 0
+        if isGinger and isDisplay then
+            if not _G.GingerMeshOrig[refPart] then
+                _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
+            end
+            -- Front-back single-axis per request + tilt -45 below.
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
+            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
+            _G.GingerHipLocked[refPart] = true
+            drawSBGizmo(refPart)
+            -- Tilt -45, guarded: skip when linked to character (local check only).
+            do
+                local char = game.Players.LocalPlayer.Character
+                local tied = char and refPart:IsDescendantOf(char)
+                if not tied and char then
+                    for _, c in ipairs(refPart:GetChildren()) do
+                        if (c:IsA("Motor6D") or c:IsA("Weld") or c:IsA("WeldConstraint")) then
+                            local o = (c.Part0 == refPart) and c.Part1 or ((c.Part1 == refPart) and c.Part0 or nil)
+                            if o and o:IsDescendantOf(char) then tied = true break end
+                        elseif c:IsA("RigidConstraint") then
+                            local a0 = c.Attachment0 and c.Attachment0.Parent
+                            local a1 = c.Attachment1 and c.Attachment1.Parent
+                            local o = (a0 == refPart) and a1 or ((a1 == refPart) and a0 or nil)
+                            if o and o:IsDescendantOf(char) then tied = true break end
+                        end
+                    end
+                end
+                if not tied then
+                    if not _G.GingerCF then _G.GingerCF = {} end
+                    if not _G.GingerCF[refPart] then _G.GingerCF[refPart] = refPart.CFrame end
+                    refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(-45),0,0)
+                else
+                    -- Tied: item-side only, never character side.
+                    if not _G.GingerJointOrig then _G.GingerJointOrig = {} end
+                    if not _G.GingerAttachOrig then _G.GingerAttachOrig = {} end
+                    local moved = false
+                    local scopes = {refPart}
+                    if refPart.Parent then scopes[2] = refPart.Parent end
+                    for _, scope in ipairs(scopes) do
+                        for _, c in ipairs(scope:GetChildren()) do
+                            if (c:IsA("Motor6D") or c:IsA("Weld")) and c.Part1 == refPart then
+                                if not _G.GingerJointOrig[c] then _G.GingerJointOrig[c] = c.C0 end
+                                c.C0 = _G.GingerJointOrig[c] * CFrame.Angles(math.rad(-45),0,0)
+                                moved = true
+                            end
+                        end
+                    end
+                    if not moved then
+                        for _, a in ipairs(refPart:GetChildren()) do
+                            if a:IsA("Attachment") then
+                                if not _G.GingerAttachOrig[a] then _G.GingerAttachOrig[a] = a.CFrame end
+                                a.CFrame = _G.GingerAttachOrig[a] * CFrame.Angles(math.rad(-45),0,0)
+                            end
+                        end
+                    end
+                end
+            end
+        elseif isGinger and not isDisplay then
+            -- Held Ginger: same tiny size as hip, positive default orientation.
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
+            mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
+        else
+            -- Other guns: release stale custom visuals, same-type IDs only so never giant.
+            if _G.GingerHipLocked[refPart] then
+                local snap = _G.GingerMeshOrig[refPart]
+                if snap then
+                    if snap.MeshId then mesh.MeshId = snap.MeshId end
+                    if snap.TextureId then mesh.TextureId = snap.TextureId end
+                    if snap.Scale then mesh.Scale = snap.Scale end
+                end
+                _G.GingerHipLocked[refPart] = nil
+                _G.GingerMeshOrig[refPart] = nil
+                if _G.GingerCF and _G.GingerCF[refPart] then
+                    pcall(function() refPart.CFrame = _G.GingerCF[refPart] end)
+                    _G.GingerCF[refPart] = nil
+                end
+                if _G.GingerJointOrig then
+                    for j, c0 in pairs(_G.GingerJointOrig) do
+                        if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                        _G.GingerJointOrig[j] = nil
+                    end
+                end
+                if _G.GingerAttachOrig then
+                    for a, cf in pairs(_G.GingerAttachOrig) do
+                        if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                        if a.Parent == refPart then _G.GingerAttachOrig[a] = nil end
+                    end
+                end
+            end
+            clearSBGizmo(refPart)
+            if _G.SBXBase[refPart] then
+                pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
+                _G.SBXBase[refPart] = nil
+            end
+            if _G.SBJointOrig then
+                for j, c0 in pairs(_G.SBJointOrig) do
+                    if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                    _G.SBJointOrig[j] = nil
+                end
+            end
+            if _G.SBAttachOrig then
+                for a, cf in pairs(_G.SBAttachOrig) do
+                    if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                    if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+                end
+            end
+            if (weaponData.kind or "FileMesh") ~= "FileMesh" then
+                return
+            end
+            mesh.MeshId = weaponData.meshid
+            mesh.TextureId = weaponData.textureid
+            if isSB and isDisplay then
+                if not _G.GingerMeshOrig[refPart] then
+                    _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
+                end
+                local s0 = weaponData.scale
+                -- Positive: negative mirrors turn faces inside-out (the see-through).
+                -- Rotation comes from the X-45 paths below, never from Scale signs.
+                mesh.Scale = Vector3.new(math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
+                drawSBGizmo(refPart)
+                -- X -45. Free preview only (local link check, no scans): tied skips.
+                local char = game.Players.LocalPlayer.Character
+                local tied = char and refPart:IsDescendantOf(char)
+                if not tied and char then
+                    for _, c in ipairs(refPart:GetChildren()) do
+                        if (c:IsA("Motor6D") or c:IsA("Weld") or c:IsA("WeldConstraint")) then
+                            local o = (c.Part0 == refPart) and c.Part1 or ((c.Part1 == refPart) and c.Part0 or nil)
+                            if o and o:IsDescendantOf(char) then tied = true break end
+                        elseif c:IsA("RigidConstraint") then
+                            local a0 = c.Attachment0 and c.Attachment0.Parent
+                            local a1 = c.Attachment1 and c.Attachment1.Parent
+                            local o = (a0 == refPart) and a1 or ((a1 == refPart) and a0 or nil)
+                            if o and o:IsDescendantOf(char) then tied = true break end
+                        end
+                    end
+                end
+                if not tied then
+                    if not _G.SBXBase[refPart] then _G.SBXBase[refPart] = refPart.CFrame end
+                    refPart.CFrame = _G.SBXBase[refPart] * CFrame.Angles(math.rad(-45),0,0)
+                else
+                    -- Tied: item-side only, never character side. Safe C0 / own attachments.
+                    if not _G.SBJointOrig then _G.SBJointOrig = {} end
+                    if not _G.SBAttachOrig then _G.SBAttachOrig = {} end
+                    local moved = false
+                    local scopes = {refPart}
+                    if refPart.Parent then scopes[2] = refPart.Parent end
+                    for _, scope in ipairs(scopes) do
+                        for _, c in ipairs(scope:GetChildren()) do
+                            if (c:IsA("Motor6D") or c:IsA("Weld")) and c.Part1 == refPart then
+                                if not _G.SBJointOrig[c] then _G.SBJointOrig[c] = c.C0 end
+                                c.C0 = _G.SBJointOrig[c] * CFrame.Angles(math.rad(-45),0,0)
+                                moved = true
+                            end
+                        end
+                    end
+                    if not moved then
+                        for _, a in ipairs(refPart:GetChildren()) do
+                            if a:IsA("Attachment") then
+                                if not _G.SBAttachOrig[a] then _G.SBAttachOrig[a] = a.CFrame end
+                                a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(math.rad(-45),0,0)
+                            end
+                        end
+                    end
+                end
+            else
+                mesh.Scale = weaponData.scale
+            end
+        end
+    end
+end
+
+local InventoryModule = require(game.ReplicatedStorage.Modules.InventoryModule)
+local ProfileData = require(game.ReplicatedStorage.Modules.ProfileData)
+local Sync = require(game.ReplicatedStorage.Database.Sync)
+
+for name, itemData in pairs(Sync.Weapons) do
+    itemData.SortWithinGroup = itemData.SortWithinGroup or 0
+    itemData.SortGroup = itemData.SortGroup or nil
+    itemData.Name = itemData.Name or itemData.ItemName or name
+    itemData.Rarity = itemData.Rarity or "Common"
+    if Sync.Rarities[itemData.Rarity] then
+        local weaponMeshInfo = getWeaponData(name)
+        if weaponMeshInfo and weaponMeshInfo.meshid and weaponMeshInfo.textureid and weaponMeshInfo.scale and weaponMeshInfo.size then
+            ProfileData.Weapons.Owned[name] = 1
+        end
+    end
+end
+
+local UpdateInventory = filtergc("table", {Keys = {"UpdateInventory"}}, true).UpdateInventory
+for key, func in pairs(getgc()) do
+    if typeof(func) == "function" and islclosure(func) and debug.info(func, "l") == 122 and #debug.getupvalues(func) == 2 then
+        UpdateInventory(debug.getupvalue(func, 2), InventoryModule.MyInventory)
+    end
+end
+
+local function isMurder()
+    local success, result = pcall(function()
+        for _, v in pairs(game.Players.LocalPlayer.Character:GetChildren()) do
+            if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
+                return true
+            end
+        end
+        for _, v in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+            if typeof(v) == "Instance" and v:IsA("Tool") and v:GetAttribute("ItemType") == "Knife" then
+                return true
+            end
+        end
+        return false
+    end)
+    if success then return result end
+    return false
+end
+
+game.Workspace.ChildAdded:Connect(function(ch)
+    if ch and ch:IsA("BasePart") and ch.Name == "StuckKnife" then
+        local mesh = ch:WaitForChild("Mesh")
+        if mesh then
+            local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
+            local knifedata = getWeaponData(equippedKnifeName)
+            if knifedata and isMurder() then
+                mesh.MeshId = knifedata.meshid
+                mesh.TextureId = knifedata.textureid
+                mesh.Scale = knifedata.scale
+            end
+        end
+    end
+end)
+
+while wait() do
+    if MY_RUN ~= getgenv().GingerRunId then break end
+    local char = game.Players.LocalPlayer.Character
+    if char then
+        local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
+        local equippedGunName = ProfileData.Weapons.Equipped.Gun
+        for _, tool in pairs(char:GetChildren()) do
+            if tool and tool:IsA("Tool") then
+                local itemType = tool:GetAttribute("ItemType")
+                local Handle = tool:FindFirstChild("Handle")
+                if Handle then
+                    if itemType == "Knife" and equippedKnifeName then
+                        local knifedata = getWeaponData(equippedKnifeName)
+                        if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
+                            applyWeaponMesh(Handle, knifedata, equippedKnifeName, "Knife")
+                        end
+                    elseif itemType == "Gun" and equippedGunName then
+                        local gundata = getWeaponData(equippedGunName)
+                        if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
+                            applyWeaponMesh(Handle, gundata, equippedGunName, "Gun")
+                        end
+                    end
+                end
+            end
+        end
+        local DisplayRefGun = char:FindFirstChild("DisplayRefGun")
+        if DisplayRefGun then
+            local refVal = DisplayRefGun.Value
+            if refVal and typeof(refVal) == "Instance" and equippedGunName then
+                local gundata = getWeaponData(equippedGunName)
+                if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
+                    applyWeaponMesh(refVal, gundata, equippedGunName)
+                end
+            end
+        end
+        local DisplayRefKnife = char:FindFirstChild("DisplayRefKnife")
+        if DisplayRefKnife then
+            local refVal = DisplayRefKnife.Value
+            if refVal and typeof(refVal) == "Instance" and equippedKnifeName then
+                local knifedata = getWeaponData(equippedKnifeName)
+                if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
+                    applyWeaponMesh(refVal, knifedata, equippedKnifeName)
+                end
+            end
+        end
+    end
+end
