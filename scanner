@@ -1,0 +1,35 @@
+-- animscan.lua - list every Animation instance in the game with its ID.
+-- Run once in MM2. Copy IDs from console (F9). Only Nikilis-owned IDs will
+-- actually load during MM2; foreign/own uploads get refused the same way.
+
+local seen = {}
+local function report(inst)
+    local id = ""
+    pcall(function() id = tostring(inst.AnimationId) end)
+    if id == "" then return end
+    if seen[id] then return end
+    seen[id] = true
+    print("[AnimScan] " .. inst:GetFullName() .. " -> " .. id)
+end
+
+local scopes = {game.Workspace, game.ReplicatedStorage}
+pcall(function()
+    local p = game.Players.LocalPlayer
+    if p.Character then table.insert(scopes, p.Character) end
+    local bp = p:FindFirstChildOfClass("Backpack")
+    if bp then table.insert(scopes, bp) end
+    local pg = p:FindFirstChildOfClass("PlayerGui")
+    if pg then table.insert(scopes, pg) end
+end)
+
+for _, scope in ipairs(scopes) do
+    local ok, desc = pcall(function() return scope:GetDescendants() end)
+    if ok and desc then
+        for _, d in ipairs(desc) do
+            if d:IsA("Animation") then
+                pcall(report, d)
+            end
+        end
+    end
+end
+print("[AnimScan] done. Paste a hold-like ID back to wire it to Ginger.")
