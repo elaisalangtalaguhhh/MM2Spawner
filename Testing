@@ -114,7 +114,8 @@ if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
 local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     local isDisplay = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
     if not weaponData or not weaponData.meshid then
-        -- Unknown gun: release stale Ginger hip so other guns appear.
+        -- Unknown gun: straighten slot (SB yaw never sticks) + release stale Ginger.
+        if isDisplay then restoreSB(refPart) end
         if isDisplay and _G.GingerHipLocked[refPart] then
             local snap = _G.GingerMeshOrig[refPart]
             if snap then
@@ -151,6 +152,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
         if stillFlipped then return end
         _G.GingerHipLocked[refPart] = nil
+        restoreSB(refPart)
     end
 
     -- ORIGINAL Grip logic untouched (hand default), plus SB hand yaw (Grip moves tool only).
@@ -199,6 +201,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
         -- Non-ginger MeshPart cross-type guard: only same-type shows, else restore/leave.
         if not isGinger then
+            if isDisplay then restoreSB(refPart) end
             if _G.GingerHipLocked[refPart] then
                 local snap = _G.GingerMeshOrig[refPart]
                 if snap then
@@ -239,7 +242,9 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.TextureId = weaponData.textureid
             mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
         else
-            -- Other guns: release stale Ginger, same-type IDs only so never giant.
+            -- Other guns: straighten slot first (SB yaw never sticks), then release
+            -- stale Ginger, same-type IDs only so never giant.
+            if isDisplay then restoreSB(refPart) end
             if _G.GingerHipLocked[refPart] then
                 local snap = _G.GingerMeshOrig[refPart]
                 if snap then
