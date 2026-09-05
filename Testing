@@ -243,6 +243,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
+                if _G.GingerCF and _G.GingerCF[refPart] then
+                    pcall(function() refPart.CFrame = _G.GingerCF[refPart] end)
+                    _G.GingerCF[refPart] = nil
+                end
             end
         end
         return
@@ -258,10 +262,17 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         else
             local m = refPart:FindFirstChildOfClass("SpecialMesh")
             stillFlipped = m and (m.MeshId == weaponData.meshid)
-                and m.Scale.X < 0 and m.Scale.Y > 0 and m.Scale.Z < 0
+                and m.Scale.X < 0 and m.Scale.Y < 0 and m.Scale.Z > 0
                 or false
         end
-        if stillFlipped then return end
+        if stillFlipped then
+            if _G.GingerCF and _G.GingerCF[refPart] then
+                pcall(function()
+                    refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(-45),0,0)
+                end)
+            end
+            return
+        end
         _G.GingerHipLocked[refPart] = nil
     end
 
@@ -341,12 +352,35 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             if not _G.GingerMeshOrig[refPart] then
                 _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
             end
-            -- Proven flip+shrink. Scale only: cannot spin player.
+            -- Front-back + tilt -45. Mirror stays even-count (solid).
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
-            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
+            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
             _G.GingerHipLocked[refPart] = true
             drawSBGizmo(refPart)
+            -- Tilt -45, guarded: skip when linked to character (local check only).
+            do
+                local char = game.Players.LocalPlayer.Character
+                local tied = char and refPart:IsDescendantOf(char)
+                if not tied and char then
+                    for _, c in ipairs(refPart:GetChildren()) do
+                        if (c:IsA("Motor6D") or c:IsA("Weld") or c:IsA("WeldConstraint")) then
+                            local o = (c.Part0 == refPart) and c.Part1 or ((c.Part1 == refPart) and c.Part0 or nil)
+                            if o and o:IsDescendantOf(char) then tied = true break end
+                        elseif c:IsA("RigidConstraint") then
+                            local a0 = c.Attachment0 and c.Attachment0.Parent
+                            local a1 = c.Attachment1 and c.Attachment1.Parent
+                            local o = (a0 == refPart) and a1 or ((a1 == refPart) and a0 or nil)
+                            if o and o:IsDescendantOf(char) then tied = true break end
+                        end
+                    end
+                end
+                if not tied then
+                    if not _G.GingerCF then _G.GingerCF = {} end
+                    if not _G.GingerCF[refPart] then _G.GingerCF[refPart] = refPart.CFrame end
+                    refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(-45),0,0)
+                end
+            end
         elseif isGinger and not isDisplay then
             -- Held Ginger: same tiny size as hip, positive default orientation.
             mesh.MeshId = weaponData.meshid
@@ -363,6 +397,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
+                if _G.GingerCF and _G.GingerCF[refPart] then
+                    pcall(function() refPart.CFrame = _G.GingerCF[refPart] end)
+                    _G.GingerCF[refPart] = nil
+                end
             end
             clearSBGizmo(refPart)
             if _G.SBXBase[refPart] then
