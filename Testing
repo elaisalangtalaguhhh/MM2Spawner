@@ -287,6 +287,11 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
         _G.GingerHipLocked[refPart] = nil
     end
+    -- Fresh Ginger must never inherit Sunrise/Blossom yaw or arrows.
+    if isGinger and isDisplay then
+        restoreSB(refPart)
+        clearSBGizmo(refPart)
+    end
 
     -- ORIGINAL Grip logic untouched (hand default for everything).
     if weaponData.meshid:find("79401392") then
