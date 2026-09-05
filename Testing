@@ -85,6 +85,58 @@ local GINGER_ID = "15374602183"
 local GINGER_DISPLAY_SCALE = 0.10 -- ginger hip+held size
 local BLOSSOM_MESH = "12322809632"
 local SUNRISE_MESH = "109742397574153"
+local GINGER_ANIM_ID = "rbxassetid://16077545791" -- hold anim, visual-only
+if _G.GingerAnimTrack == nil then _G.GingerAnimTrack = nil end
+if _G.GingerAnimTool == nil then _G.GingerAnimTool = nil end
+if _G.GingerAnimHum == nil then _G.GingerAnimHum = nil end
+
+-- Hold-only Ginger animation. Stops on unequip, switch, death, respawn, re-run.
+local function manageGingerAnim(char)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local heldTool
+    if hum and hum.Health > 0 then
+        for _, tool in pairs(char:GetChildren()) do
+            if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Gun" then
+                local h = tool:FindFirstChild("Handle")
+                if h then
+                    local mid = ""
+                    if h:IsA("MeshPart") then
+                        mid = h.MeshId or ""
+                    else
+                        local sm = h:FindFirstChildOfClass("SpecialMesh")
+                        if sm then mid = sm.MeshId or "" end
+                    end
+                    if mid:find(GINGER_ID) ~= nil then heldTool = tool break end
+                end
+            end
+        end
+    end
+    local track, oldTool, oldHum = _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum
+    if heldTool and hum then
+        local alive = false
+        if track and oldTool == heldTool and oldHum == hum then
+            alive = pcall(function() return track.IsPlaying end) and track.IsPlaying
+        end
+        if not alive then
+            pcall(function() if track then track:Stop() end end)
+            local anim = Instance.new("Animation")
+            anim.AnimationId = GINGER_ANIM_ID
+            local ok, newTrack = pcall(function() return hum:LoadAnimation(anim) end)
+            if ok and newTrack then
+                newTrack.Priority = Enum.AnimationPriority.Action
+                newTrack.Looped = true
+                pcall(function() newTrack:Play() end)
+                _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = newTrack, heldTool, hum
+            else
+                _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
+            end
+            pcall(function() anim:Destroy() end)
+        end
+    else
+        if track then pcall(function() track:Stop() end) end
+        _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
+    end
+end
 
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
@@ -608,8 +660,16 @@ game.Workspace.ChildAdded:Connect(function(ch)
 end)
 
 while wait() do
-    if MY_RUN ~= getgenv().GingerRunId then break end
+    if MY_RUN ~= getgenv().GingerRunId then
+        if _G.GingerAnimTrack then pcall(function() _G.GingerAnimTrack:Stop() end) end
+        _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
+        break
+    end
     local char = game.Players.LocalPlayer.Character
+    if not char then
+        if _G.GingerAnimTrack then pcall(function() _G.GingerAnimTrack:Stop() end) end
+        _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
+    end
     if char then
         local equippedKnifeName = ProfileData.Weapons.Equipped.Knife
         local equippedGunName = ProfileData.Weapons.Equipped.Gun
@@ -652,5 +712,6 @@ while wait() do
                 end
             end
         end
+        pcall(manageGingerAnim, char)
     end
 end
