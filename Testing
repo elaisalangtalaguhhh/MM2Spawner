@@ -82,7 +82,7 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size
+local GINGER_DISPLAY_SCALE = 0.10 -- ginger hip+held size
 local BLOSSOM_MESH = "12322809632"
 local SUNRISE_MESH = "109742397574153"
 
