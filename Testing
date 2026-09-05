@@ -389,7 +389,9 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                     _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
                 end
                 local s0 = weaponData.scale
-                mesh.Scale = Vector3.new(-math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
+                -- Positive: negative mirrors turn faces inside-out (the see-through).
+                -- Rotation comes from the X-45 paths below, never from Scale signs.
+                mesh.Scale = Vector3.new(math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
                 drawSBGizmo(refPart)
                 -- X -45. Free preview only (local link check, no scans): tied skips.
                 local char = game.Players.LocalPlayer.Character
