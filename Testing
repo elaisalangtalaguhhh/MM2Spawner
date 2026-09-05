@@ -262,7 +262,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         else
             local m = refPart:FindFirstChildOfClass("SpecialMesh")
             stillFlipped = m and (m.MeshId == weaponData.meshid)
-                and m.Scale.X < 0 and m.Scale.Y < 0 and m.Scale.Z > 0
+                and m.Scale.X < 0 and m.Scale.Y > 0 and m.Scale.Z < 0
                 or false
         end
         if stillFlipped then
@@ -355,7 +355,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             -- Front-back + tilt -45. Mirror stays even-count (solid).
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
-            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
+            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
             _G.GingerHipLocked[refPart] = true
             drawSBGizmo(refPart)
             -- Tilt -45, guarded: skip when linked to character (local check only).
