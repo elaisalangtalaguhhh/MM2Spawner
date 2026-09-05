@@ -90,13 +90,6 @@ getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
 if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
--- Purge blank snapshots saved while slots were still empty (they restore as invisible).
-for ref, snap in pairs(_G.GingerMeshOrig) do
-    if type(snap) ~= "table" or not snap.MeshId or snap.MeshId == "" then
-        _G.GingerMeshOrig[ref] = nil
-        _G.GingerHipLocked[ref] = nil
-    end
-end
 if not _G.SBXBase then _G.SBXBase = {} end
 if not _G.SBGizmo then _G.SBGizmo = {} end
 -- One-time sweep: destroy gizmo parts left by previous runs (visual-only, safe).
@@ -173,8 +166,7 @@ local function drawSBGizmo(refPart)
         head.Material = Enum.Material.Neon
         head.CanCollide = false
         head.CanQuery = false
-        local okLook, lookCF = pcall(CFrame.lookAt, endPos, endPos + tangent)
-        head.CFrame = refPart.CFrame * (okLook and lookCF or CFrame.new(endPos))
+        head.CFrame = refPart.CFrame * CFrame.lookAt(endPos, endPos + tangent)
         head.Parent = refPart
         track(head)
         local w = Instance.new("WeldConstraint")
@@ -208,60 +200,11 @@ local function drawSBGizmo(refPart)
 end
 -- ===== GIZMO TEMP END =====
 
--- Undo Sunrise/Blossom yaw on a shared slot so later guns come back straight.
-local function restoreSB(refPart)
-    if _G.SBXBase[refPart] then
-        pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
-        _G.SBXBase[refPart] = nil
-    end
-    if _G.SBJointOrig then
-        for j, c0 in pairs(_G.SBJointOrig) do
-            if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
-            _G.SBJointOrig[j] = nil
-        end
-    end
-    if _G.SBAttachOrig then
-    for a, cf in pairs(_G.SBAttachOrig) do
-        if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
-        if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
-    end
-end
-
--- Undo GingerScope tilt WITHOUT touching its mesh lock/snapshot.
--- Lets another custom state capture a clean base first.
-local function resetGingerTilt(refPart)
-    if _G.GingerCF and _G.GingerCF[refPart] then
-        pcall(function() refPart.CFrame = _G.GingerCF[refPart] end)
-        _G.GingerCF[refPart] = nil
-    end
-    if _G.GingerJointOrig then
-        for j, c0 in pairs(_G.GingerJointOrig) do
-            if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
-            _G.GingerJointOrig[j] = nil
-        end
-    end
-    if _G.GingerAttachOrig then
-        for a, cf in pairs(_G.GingerAttachOrig) do
-            if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
-            if a.Parent == refPart then _G.GingerAttachOrig[a] = nil end
-        end
-    end
-end
-
 local function isSBMesh(meshid)
     return (meshid:find(BLOSSOM_MESH) ~= nil) or (meshid:find(SUNRISE_MESH) ~= nil)
 end
 
-local function _applyInner(refPart, weaponData, weaponName, weapontype)
-    -- Display slots are sometimes Models: work on their main part.
-    if not refPart:IsA("BasePart") then
-        local part = refPart:FindFirstChild("GunDisplay", true)
-            or refPart:FindFirstChild("KnifeDisplay", true)
-            or refPart:FindFirstChildOfClass("MeshPart", true)
-            or refPart:FindFirstChildOfClass("Part", true)
-        if not part then return end
-        refPart = part
-    end
+local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     local isDisplay = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
     if not weaponData or not weaponData.meshid then
         -- Unknown gun: clear our visuals so the slot shows game default.
@@ -343,12 +286,6 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
             return
         end
         _G.GingerHipLocked[refPart] = nil
-        resetGingerTilt(refPart)
-    end
-    -- Fresh Ginger must never inherit Sunrise/Blossom yaw or arrows.
-    if isGinger and isDisplay then
-        restoreSB(refPart)
-        clearSBGizmo(refPart)
     end
 
     -- ORIGINAL Grip logic untouched (hand default for everything).
@@ -386,7 +323,7 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
     end
 
     if refPart:IsA("MeshPart") then
-        if (isGinger or isSB) and isDisplay and not _G.GingerMeshOrig[refPart] and refPart.MeshId ~= "" then
+        if (isGinger or isSB) and isDisplay and not _G.GingerMeshOrig[refPart] then
             _G.GingerMeshOrig[refPart] = {MeshId = refPart.MeshId, TextureID = refPart.TextureID}
         end
         if not isGinger and not isSB then
@@ -424,7 +361,7 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
         end
         refPart.Transparency = 0
         if isGinger and isDisplay then
-            if not _G.GingerMeshOrig[refPart] and mesh.MeshId ~= "" then
+            if not _G.GingerMeshOrig[refPart] then
                 _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
             end
             -- Front-back single-axis per request + tilt -45 below.
@@ -432,7 +369,25 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
             mesh.TextureId = weaponData.textureid
             mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
             _G.GingerHipLocked[refPart] = true
-            pcall(drawSBGizmo, refPart)
+            drawSBGizmo(refPart)
+            -- SB yaw must be restored BEFORE capturing our tilt base below,
+            -- or its leftover tilt bakes into our base on Blossom/Sunrise → Ginger.
+            if _G.SBXBase[refPart] then
+                pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
+                _G.SBXBase[refPart] = nil
+            end
+            if _G.SBJointOrig then
+                for j, c0 in pairs(_G.SBJointOrig) do
+                    if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                    _G.SBJointOrig[j] = nil
+                end
+            end
+            if _G.SBAttachOrig then
+                for a, cf in pairs(_G.SBAttachOrig) do
+                    if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                    if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+                end
+            end
             -- Tilt -45, guarded: skip when linked to character (local check only).
             do
                 local char = game.Players.LocalPlayer.Character
@@ -453,9 +408,7 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
                 if not tied then
                     if not _G.GingerCF then _G.GingerCF = {} end
                     if not _G.GingerCF[refPart] then _G.GingerCF[refPart] = refPart.CFrame end
-                    pcall(function()
-                        refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(-45),0,0)
-                    end)
+                    refPart.CFrame = _G.GingerCF[refPart] * CFrame.Angles(math.rad(-45),0,0)
                 else
                     -- Tied: item-side only, never character side.
                     if not _G.GingerJointOrig then _G.GingerJointOrig = {} end
@@ -467,9 +420,7 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
                         for _, c in ipairs(scope:GetChildren()) do
                             if (c:IsA("Motor6D") or c:IsA("Weld")) and c.Part1 == refPart then
                                 if not _G.GingerJointOrig[c] then _G.GingerJointOrig[c] = c.C0 end
-                                pcall(function()
-                                    c.C0 = _G.GingerJointOrig[c] * CFrame.Angles(math.rad(-45),0,0)
-                                end)
+                                c.C0 = _G.GingerJointOrig[c] * CFrame.Angles(math.rad(-45),0,0)
                                 moved = true
                             end
                         end
@@ -478,9 +429,7 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
                         for _, a in ipairs(refPart:GetChildren()) do
                             if a:IsA("Attachment") then
                                 if not _G.GingerAttachOrig[a] then _G.GingerAttachOrig[a] = a.CFrame end
-                                pcall(function()
-                                    a.CFrame = _G.GingerAttachOrig[a] * CFrame.Angles(math.rad(-45),0,0)
-                                end)
+                                a.CFrame = _G.GingerAttachOrig[a] * CFrame.Angles(math.rad(-45),0,0)
                             end
                         end
                     end
@@ -542,14 +491,14 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
             if isSB and isDisplay then
-                if not _G.GingerMeshOrig[refPart] and mesh.MeshId ~= "" then
+                if not _G.GingerMeshOrig[refPart] then
                     _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
                 end
                 local s0 = weaponData.scale
                 -- Positive: negative mirrors turn faces inside-out (the see-through).
                 -- Rotation comes from the X-45 paths below, never from Scale signs.
                 mesh.Scale = Vector3.new(math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
-                pcall(drawSBGizmo, refPart)
+                drawSBGizmo(refPart)
                 -- X -45. Free preview only (local link check, no scans): tied skips.
                 local char = game.Players.LocalPlayer.Character
                 local tied = char and refPart:IsDescendantOf(char)
@@ -567,12 +516,8 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
                     end
                 end
                 if not tied then
-                    -- Never capture a base over live Ginger tilt: clear it first.
-                    resetGingerTilt(refPart)
                     if not _G.SBXBase[refPart] then _G.SBXBase[refPart] = refPart.CFrame end
-                    pcall(function()
-                        refPart.CFrame = _G.SBXBase[refPart] * CFrame.Angles(math.rad(-45),0,0)
-                    end)
+                    refPart.CFrame = _G.SBXBase[refPart] * CFrame.Angles(math.rad(-45),0,0)
                 else
                     -- Tied: item-side only, never character side. Safe C0 / own attachments.
                     if not _G.SBJointOrig then _G.SBJointOrig = {} end
@@ -584,9 +529,7 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
                         for _, c in ipairs(scope:GetChildren()) do
                             if (c:IsA("Motor6D") or c:IsA("Weld")) and c.Part1 == refPart then
                                 if not _G.SBJointOrig[c] then _G.SBJointOrig[c] = c.C0 end
-                                pcall(function()
-                                    c.C0 = _G.SBJointOrig[c] * CFrame.Angles(math.rad(-45),0,0)
-                                end)
+                                c.C0 = _G.SBJointOrig[c] * CFrame.Angles(math.rad(-45),0,0)
                                 moved = true
                             end
                         end
@@ -595,9 +538,7 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
                         for _, a in ipairs(refPart:GetChildren()) do
                             if a:IsA("Attachment") then
                                 if not _G.SBAttachOrig[a] then _G.SBAttachOrig[a] = a.CFrame end
-                                pcall(function()
-                                    a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(math.rad(-45),0,0)
-                                end)
+                                a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(math.rad(-45),0,0)
                             end
                         end
                     end
@@ -607,12 +548,6 @@ local function _applyInner(refPart, weaponData, weaponName, weapontype)
             end
         end
     end
-end
-
--- Wrapper: one bad slot can never kill the visual loop again.
-local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
-    local ok, err = pcall(_applyInner, refPart, weaponData, weaponName, weapontype)
-    if not ok then warn("[testing] visual skipped: " .. tostring(err)) end
 end
 
 local InventoryModule = require(game.ReplicatedStorage.Modules.InventoryModule)
