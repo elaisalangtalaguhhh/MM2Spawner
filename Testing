@@ -257,7 +257,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         else
             local m = refPart:FindFirstChildOfClass("SpecialMesh")
             stillFlipped = m and (m.MeshId == weaponData.meshid)
-                and m.Scale.X > 0 and m.Scale.Y < 0 and m.Scale.Z < 0
+                and m.Scale.X < 0 and m.Scale.Y < 0 and m.Scale.Z > 0
                 or false
         end
         if stillFlipped then return end
@@ -343,7 +343,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             -- Proven flip+shrink. Scale only: cannot spin player.
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
-            mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
+            mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
             _G.GingerHipLocked[refPart] = true
         elseif isGinger and not isDisplay then
             -- Held Ginger: same tiny size as hip, positive default orientation.
