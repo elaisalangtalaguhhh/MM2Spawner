@@ -112,6 +112,18 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             _G.GingerHipLocked[refPart] = nil
             _G.GingerMeshOrig[refPart] = nil
             if _G.SBBase then _G.SBBase[refPart] = nil end
+            if _G.SBJointOrig then
+                for j, c0 in pairs(_G.SBJointOrig) do
+                    if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                    _G.SBJointOrig[j] = nil
+                end
+            end
+            if _G.SBAttachOrig then
+                for a, cf in pairs(_G.SBAttachOrig) do
+                    if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                    if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+                end
+            end
         end
         return
     end
@@ -234,6 +246,18 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
                 if _G.SBBase then _G.SBBase[refPart] = nil end
+                if _G.SBJointOrig then
+                    for j, c0 in pairs(_G.SBJointOrig) do
+                        if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
+                        _G.SBJointOrig[j] = nil
+                    end
+                end
+                if _G.SBAttachOrig then
+                    for a, cf in pairs(_G.SBAttachOrig) do
+                        if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
+                        if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
+                    end
+                end
             end
             if (weaponData.kind or "FileMesh") ~= "FileMesh" then
                 -- cross-type new MeshPart gun in old Part slot: restore default look instead of giant
@@ -284,6 +308,31 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                     if not _G.SBBase then _G.SBBase = {} end
                     if not _G.SBBase[refPart] then _G.SBBase[refPart] = refPart.CFrame end
                     refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(0,math.rad(90),0)
+                else
+                    -- Tied: rotate item-side only. Motor/Weld C0 when display is Part1,
+                    -- else own Attachments. Never touches character side.
+                    if not _G.SBJointOrig then _G.SBJointOrig = {} end
+                    if not _G.SBAttachOrig then _G.SBAttachOrig = {} end
+                    local moved = false
+                    local function tryJoint(inst)
+                        if (inst:IsA("Motor6D") or inst:IsA("Weld")) and inst.Part1 == refPart then
+                            if not _G.SBJointOrig[inst] then _G.SBJointOrig[inst] = inst.C0 end
+                            inst.C0 = _G.SBJointOrig[inst] * CFrame.Angles(0,math.rad(90),0)
+                            moved = true
+                        end
+                    end
+                    for _, c in ipairs(refPart:GetChildren()) do tryJoint(c) end
+                    if refPart.Parent then
+                        for _, c in ipairs(refPart.Parent:GetChildren()) do tryJoint(c) end
+                    end
+                    if not moved then
+                        for _, a in ipairs(refPart:GetChildren()) do
+                            if a:IsA("Attachment") then
+                                if not _G.SBAttachOrig[a] then _G.SBAttachOrig[a] = a.CFrame end
+                                a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(0,math.rad(90),0)
+                            end
+                        end
+                    end
                 end
             else
                 mesh.Scale = weaponData.scale * OTHER_SCALE
