@@ -90,6 +90,7 @@ getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
 if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
+if not _G.SBXBase then _G.SBXBase = {} end
 if not _G.SBGizmo then _G.SBGizmo = {} end
 
 -- ===== GIZMO TEMP (delete this whole block on next prompt) =====
@@ -196,6 +197,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         -- Unknown gun: clear our visuals so the slot shows game default.
         if isDisplay then
             clearSBGizmo(refPart)
+            if _G.SBXBase[refPart] then
+                pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
+                _G.SBXBase[refPart] = nil
+            end
             if _G.GingerHipLocked[refPart] then
                 local snap = _G.GingerMeshOrig[refPart]
                 if snap then
@@ -284,6 +289,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 _G.GingerMeshOrig[refPart] = nil
             end
             clearSBGizmo(refPart)
+            if _G.SBXBase[refPart] then
+                pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
+                _G.SBXBase[refPart] = nil
+            end
             if (weaponData.kind or "FileMesh") ~= "MeshPart" then return end
         end
         local specialMesh = refPart:FindFirstChildOfClass("SpecialMesh")
@@ -325,19 +334,42 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 _G.GingerMeshOrig[refPart] = nil
             end
             clearSBGizmo(refPart)
+            if _G.SBXBase[refPart] then
+                pcall(function() refPart.CFrame = _G.SBXBase[refPart] end)
+                _G.SBXBase[refPart] = nil
+            end
             if (weaponData.kind or "FileMesh") ~= "FileMesh" then
                 return
             end
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
             if isSB and isDisplay then
-                -- Sunrise/Blossom hip mirror, own magnitude so size unchanged.
                 if not _G.GingerMeshOrig[refPart] then
                     _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
                 end
                 local s0 = weaponData.scale
                 mesh.Scale = Vector3.new(-math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
                 drawSBGizmo(refPart)
+                -- X -45. Free preview only (local link check, no scans): tied skips.
+                local char = game.Players.LocalPlayer.Character
+                local tied = char and refPart:IsDescendantOf(char)
+                if not tied and char then
+                    for _, c in ipairs(refPart:GetChildren()) do
+                        if (c:IsA("Motor6D") or c:IsA("Weld") or c:IsA("WeldConstraint")) then
+                            local o = (c.Part0 == refPart) and c.Part1 or ((c.Part1 == refPart) and c.Part0 or nil)
+                            if o and o:IsDescendantOf(char) then tied = true break end
+                        elseif c:IsA("RigidConstraint") then
+                            local a0 = c.Attachment0 and c.Attachment0.Parent
+                            local a1 = c.Attachment1 and c.Attachment1.Parent
+                            local o = (a0 == refPart) and a1 or ((a1 == refPart) and a0 or nil)
+                            if o and o:IsDescendantOf(char) then tied = true break end
+                        end
+                    end
+                end
+                if not tied then
+                    if not _G.SBXBase[refPart] then _G.SBXBase[refPart] = refPart.CFrame end
+                    refPart.CFrame = _G.SBXBase[refPart] * CFrame.Angles(math.rad(-45),0,0)
+                end
             else
                 mesh.Scale = weaponData.scale
             end
