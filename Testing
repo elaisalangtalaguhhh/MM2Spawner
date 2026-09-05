@@ -321,6 +321,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
         local specialMesh = refPart:FindFirstChildOfClass("SpecialMesh")
         if specialMesh then specialMesh:Destroy() end
+        refPart.Transparency = 0
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
         if isGinger and isDisplay then _G.GingerHipLocked[refPart] = true end
@@ -334,6 +335,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         elseif mesh.MeshType ~= Enum.MeshType.FileMesh then
             mesh.MeshType = Enum.MeshType.FileMesh
         end
+        refPart.Transparency = 0
         if isGinger and isDisplay then
             if not _G.GingerMeshOrig[refPart] then
                 _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
