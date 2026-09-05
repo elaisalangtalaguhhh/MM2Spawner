@@ -173,7 +173,8 @@ local function drawSBGizmo(refPart)
         head.Material = Enum.Material.Neon
         head.CanCollide = false
         head.CanQuery = false
-        head.CFrame = refPart.CFrame * CFrame.lookAt(endPos, endPos + tangent)
+        local okLook, lookCF = pcall(CFrame.lookAt, endPos, endPos + tangent)
+        head.CFrame = refPart.CFrame * (okLook and lookCF or CFrame.new(endPos))
         head.Parent = refPart
         track(head)
         local w = Instance.new("WeldConstraint")
@@ -381,7 +382,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.TextureId = weaponData.textureid
             mesh.Scale = Vector3.new(-GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
             _G.GingerHipLocked[refPart] = true
-            drawSBGizmo(refPart)
+            pcall(drawSBGizmo, refPart)
             -- Tilt -45, guarded: skip when linked to character (local check only).
             do
                 local char = game.Players.LocalPlayer.Character
@@ -492,7 +493,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 -- Positive: negative mirrors turn faces inside-out (the see-through).
                 -- Rotation comes from the X-45 paths below, never from Scale signs.
                 mesh.Scale = Vector3.new(math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
-                drawSBGizmo(refPart)
+                pcall(drawSBGizmo, refPart)
                 -- X -45. Free preview only (local link check, no scans): tied skips.
                 local char = game.Players.LocalPlayer.Character
                 local tied = char and refPart:IsDescendantOf(char)
