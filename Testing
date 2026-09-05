@@ -91,9 +91,12 @@ if _G.GingerAnimTool == nil then _G.GingerAnimTool = nil end
 if _G.GingerAnimHum == nil then _G.GingerAnimHum = nil end
 
 -- Hold-only Ginger animation. Stops on unequip, switch, death, respawn, re-run.
+local function gingerAnimLog(msg)
+    print("[GingerAnim] " .. tostring(msg))
+end
 local function manageGingerAnim(char)
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local heldTool
+    local heldTool, heldMid = nil, ""
     if hum and hum.Health > 0 then
         for _, tool in pairs(char:GetChildren()) do
             if tool:IsA("Tool") and tool:GetAttribute("ItemType") == "Gun" then
@@ -106,7 +109,7 @@ local function manageGingerAnim(char)
                         local sm = h:FindFirstChildOfClass("SpecialMesh")
                         if sm then mid = sm.MeshId or "" end
                     end
-                    if mid:find(GINGER_ID) ~= nil then heldTool = tool break end
+                    if mid:find(GINGER_ID) ~= nil then heldTool, heldMid = tool, mid break end
                 end
             end
         end
@@ -118,6 +121,10 @@ local function manageGingerAnim(char)
             alive = pcall(function() return track.IsPlaying end) and track.IsPlaying
         end
         if not alive then
+            if _G.GingerAnimState ~= "found" then
+                gingerAnimLog("holding Ginger (" .. heldTool:GetFullName() .. "), mesh=" .. heldMid:sub(1, 40))
+                _G.GingerAnimState = "found"
+            end
             pcall(function() if track then track:Stop() end end)
             local anim = Instance.new("Animation")
             anim.AnimationId = GINGER_ANIM_ID
@@ -125,14 +132,32 @@ local function manageGingerAnim(char)
             if ok and newTrack then
                 newTrack.Priority = Enum.AnimationPriority.Action
                 newTrack.Looped = true
-                pcall(function() newTrack:Play() end)
+                local okPlay, errPlay = pcall(function() newTrack:Play() end)
+                if okPlay then
+                    if _G.GingerAnimState ~= "playing" then
+                        gingerAnimLog("playing, rig=" .. tostring(hum.RigType))
+                        _G.GingerAnimState = "playing"
+                    end
+                else
+                    gingerAnimLog("Play FAILED: " .. tostring(errPlay))
+                    _G.GingerAnimState = "playfail"
+                end
                 _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = newTrack, heldTool, hum
             else
+                gingerAnimLog("LoadAnimation FAILED: " .. tostring(newTrack) .. " (asset/rig?)")
                 _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
+                _G.GingerAnimState = "loadfail"
             end
             pcall(function() anim:Destroy() end)
         end
     else
+        if _G.GingerAnimState ~= "idle" then
+            if not hum then gingerAnimLog("no humanoid")
+            elseif not hum or hum.Health <= 0 then gingerAnimLog("humanoid dead/missing")
+            else gingerAnimLog("Ginger not in hand (holding " .. tostring(heldTool) .. ")")
+            end
+            _G.GingerAnimState = "idle"
+        end
         if track then pcall(function() track:Stop() end) end
         _G.GingerAnimTrack, _G.GingerAnimTool, _G.GingerAnimHum = nil, nil, nil
     end
