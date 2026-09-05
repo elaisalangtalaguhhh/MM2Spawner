@@ -91,6 +91,10 @@ if not _G.SBAttachOrig then _G.SBAttachOrig = {} end
 
 -- Undo Sunrise/Blossom yaw on a shared slot so later guns come back straight.
 local function restoreSB(refPart)
+    if _G.SBGizmo and _G.SBGizmo[refPart] then
+        for _, inst in ipairs(_G.SBGizmo[refPart]) do pcall(function() inst:Destroy() end) end
+        _G.SBGizmo[refPart] = nil
+    end
     if not _G.SBApplied[refPart] then return end
     if _G.SBBase[refPart] then
         pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
@@ -106,6 +110,64 @@ local function restoreSB(refPart)
     end
     _G.SBApplied[refPart] = nil
 end
+-- Straighten any live yaw left by previous runs, once.
+for ref, _ in pairs(_G.SBApplied) do restoreSB(ref) end
+
+-- ===== GIZMO TEMP (delete this whole block on next prompt) =====
+if not _G.SBGizmo then _G.SBGizmo = {} end
+local function clearSBGizmo(refPart)
+    local g = _G.SBGizmo[refPart]
+    if g then
+        for _, inst in ipairs(g) do pcall(function() inst:Destroy() end) end
+    end
+    _G.SBGizmo[refPart] = nil
+end
+-- RGB world-axis arrows on Sunrise/Blossom hip so you can name the axis to turn.
+local function drawSBGizmo(refPart)
+    if _G.SBGizmo[refPart] then return end
+    local made = {}
+    local function axis(name, color, offset)
+        local a0 = Instance.new("Attachment")
+        a0.Name = "SBG0_" .. name
+        a0.CFrame = CFrame.new()
+        a0.Parent = refPart
+        local a1 = Instance.new("Attachment")
+        a1.Name = "SBG1_" .. name
+        a1.CFrame = CFrame.new(offset)
+        a1.Parent = refPart
+        local b = Instance.new("Beam")
+        b.Name = "SBGBeam_" .. name
+        b.Attachment0 = a0
+        b.Attachment1 = a1
+        b.Color = ColorSequence.new(color)
+        b.Width0 = 0.12
+        b.Width1 = 0.02
+        b.FaceCamera = false
+        b.LightEmission = 1
+        b.Parent = refPart
+        local gui = Instance.new("BillboardGui")
+        gui.Name = "SBGLbl_" .. name
+        gui.Size = UDim2.new(0, 40, 0, 40)
+        gui.AlwaysOnTop = true
+        gui.Adornee = a1
+        gui.Parent = refPart
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.Text = name
+        txt.Font = Enum.Font.GothamBlack
+        txt.TextSize = 28
+        txt.TextColor3 = color
+        txt.TextStrokeTransparency = 0
+        txt.Parent = gui
+        for _, inst in ipairs({a0, a1, b, gui}) do table.insert(made, inst) end
+    end
+    axis("X", Color3.fromRGB(255, 60, 60), Vector3.new(2, 0, 0))
+    axis("Y", Color3.fromRGB(60, 255, 60), Vector3.new(0, 2, 0))
+    axis("Z", Color3.fromRGB(80, 140, 255), Vector3.new(0, 0, 2))
+    _G.SBGizmo[refPart] = made
+end
+-- ===== GIZMO TEMP END =====
 getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
 local MY_RUN = getgenv().GingerRunId
 if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
@@ -264,7 +326,8 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.TextureId = weaponData.textureid
             -- Sunrise + Blossom hip: same Ginger X-flip, own magnitude so size unchanged.
             local mid = weaponData.meshid or ""
-            local flipHip = isDisplay and (mid:find("12322809632") or mid:find("109742397574153"))
+            local flipHip = false -- rotations off: plain default look
+            if flipHip then
             if flipHip then
                 local s0 = weaponData.scale
                 mesh.Scale = Vector3.new(-math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
@@ -327,6 +390,9 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
             else
                 mesh.Scale = weaponData.scale * OTHER_SCALE
+                if isDisplay and (mid:find("12322809632") or mid:find("109742397574153")) then
+                    drawSBGizmo(refPart)
+                end
             end
         end
     end
