@@ -111,7 +111,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             end
             _G.GingerHipLocked[refPart] = nil
             _G.GingerMeshOrig[refPart] = nil
-            if _G.SBBase then _G.SBBase[refPart] = nil end
+            if _G.SBBase and _G.SBBase[refPart] then
+                pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
+                _G.SBBase[refPart] = nil
+            end
             if _G.SBJointOrig then
                 for j, c0 in pairs(_G.SBJointOrig) do
                     if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
@@ -198,7 +201,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
-                if _G.SBBase then _G.SBBase[refPart] = nil end
+                if _G.SBBase and _G.SBBase[refPart] then
+                    pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
+                    _G.SBBase[refPart] = nil
+                end
                 if _G.SBAttachOrig then
                     for a, _ in pairs(_G.SBAttachOrig) do
                         if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
@@ -245,7 +251,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
-                if _G.SBBase then _G.SBBase[refPart] = nil end
+                if _G.SBBase and _G.SBBase[refPart] then
+                    pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
+                    _G.SBBase[refPart] = nil
+                end
                 if _G.SBJointOrig then
                     for j, c0 in pairs(_G.SBJointOrig) do
                         if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
