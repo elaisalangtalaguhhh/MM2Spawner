@@ -253,9 +253,34 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             if flipHip then
                 local s0 = weaponData.scale
                 mesh.Scale = Vector3.new(-math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
-                -- Free preview yaw 90. Character-held skips (Grip covers hand).
+                -- Yaw 90 only if nothing ties this part to your character (local check).
                 local char = game.Players.LocalPlayer.Character
-                if not (char and refPart:IsDescendantOf(char)) then
+                local tied = char and refPart:IsDescendantOf(char)
+                if not tied and char then
+                    local function linkedToChar(inst)
+                        if inst:IsA("Motor6D") or inst:IsA("Weld") or inst:IsA("WeldConstraint") then
+                            local o = (inst.Part0 == refPart) and inst.Part1 or ((inst.Part1 == refPart) and inst.Part0 or nil)
+                            if o and o:IsDescendantOf(char) then return true end
+                        elseif inst:IsA("RigidConstraint") then
+                            local a0 = inst.Attachment0 and inst.Attachment0.Parent
+                            local a1 = inst.Attachment1 and inst.Attachment1.Parent
+                            local o = (a0 == refPart) and a1 or ((a1 == refPart) and a0 or nil)
+                            if o and o:IsDescendantOf(char) then return true end
+                        end
+                        return false
+                    end
+                    for _, c in ipairs(refPart:GetChildren()) do
+                        if linkedToChar(c) then tied = true break end
+                    end
+                    if not tied and refPart.Parent then
+                        for _, c in ipairs(refPart.Parent:GetChildren()) do
+                            if (c:IsA("Motor6D") or c:IsA("Weld") or c:IsA("WeldConstraint") or c:IsA("RigidConstraint")) and linkedToChar(c) then
+                                tied = true break
+                            end
+                        end
+                    end
+                end
+                if not tied then
                     if not _G.SBBase then _G.SBBase = {} end
                     if not _G.SBBase[refPart] then _G.SBBase[refPart] = refPart.CFrame end
                     refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(0,math.rad(90),0)
