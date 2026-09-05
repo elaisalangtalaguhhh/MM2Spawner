@@ -1,5 +1,5 @@
--- testing.lua - minimal Ginger-hip fix on ORIGINAL. No joints, no CFrames, no player spin.
--- Ginger hip: locked flip+shrink once. Held Ginger: same size, default hold. Others: game default.
+-- testing.lua - clean build. Ginger hip locked flip. Sunrise/Blossom hip mirrors + axis gizmo.
+-- Everything else: game default behavior. Visual-only (others see defaults).
 
 if not isfile("mm2data.lua") then
     local result = request({
@@ -25,8 +25,8 @@ local function findMeshAndTexture(node)
             return {
                 meshid = meshId,
                 textureid = props.TextureId or props.TextureID or "",
-                scale = props.Scale or Vector3.new(1,1,1),
-                size = props.Size or Vector3.new(0.2697,1.2582,4.2087),
+                scale = props.Scale or Vector3.new(1, 1, 1),
+                size = props.Size or Vector3.new(0.2697, 1.2582, 4.2087),
                 kind = props.Scale and "FileMesh" or "MeshPart"
             }
         end
@@ -45,8 +45,8 @@ local function findMeshAndTexture(node)
                     return {
                         meshid = mid,
                         textureid = p.TextureId or p.TextureID or "",
-                        scale = p.Scale or Vector3.new(1,1,1),
-                        size = p.Size or partSize or Vector3.new(0.2697,1.2582,4.2087),
+                        scale = p.Scale or Vector3.new(1, 1, 1),
+                        size = p.Size or partSize or Vector3.new(0.2697, 1.2582, 4.2087),
                         kind = (child.Class == "MeshPart") and "MeshPart" or "FileMesh"
                     }
                 end
@@ -82,39 +82,17 @@ local function getWeaponData(name)
 end
 
 local GINGER_ID = "15374602183"
-local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size, others untouched
-local OTHER_SCALE = 1 -- every other gun/sword, hip+held, true size
-if not _G.SBBase then _G.SBBase = {} end
-if not _G.SBApplied then _G.SBApplied = {} end
-if not _G.SBJointOrig then _G.SBJointOrig = {} end
-if not _G.SBAttachOrig then _G.SBAttachOrig = {} end
+local GINGER_DISPLAY_SCALE = 0.12 -- ginger hip+held size
+local BLOSSOM_MESH = "12322809632"
+local SUNRISE_MESH = "109742397574153"
 
--- Undo Sunrise/Blossom yaw on a shared slot so later guns come back straight.
-local function restoreSB(refPart)
-    if _G.SBGizmo and _G.SBGizmo[refPart] then
-        for _, inst in ipairs(_G.SBGizmo[refPart]) do pcall(function() inst:Destroy() end) end
-        _G.SBGizmo[refPart] = nil
-    end
-    if not _G.SBApplied[refPart] then return end
-    if _G.SBBase[refPart] then
-        pcall(function() refPart.CFrame = _G.SBBase[refPart] end)
-        _G.SBBase[refPart] = nil
-    end
-    for j, c0 in pairs(_G.SBJointOrig) do
-        if j.Part1 == refPart then pcall(function() j.C0 = c0 end) end
-        _G.SBJointOrig[j] = nil
-    end
-    for a, cf in pairs(_G.SBAttachOrig) do
-        if a.Parent == refPart then pcall(function() a.CFrame = cf end) end
-        if a.Parent == refPart then _G.SBAttachOrig[a] = nil end
-    end
-    _G.SBApplied[refPart] = nil
-end
--- Straighten any live yaw left by previous runs, once.
-for ref, _ in pairs(_G.SBApplied) do restoreSB(ref) end
+getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
+local MY_RUN = getgenv().GingerRunId
+if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
+if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
+if not _G.SBGizmo then _G.SBGizmo = {} end
 
 -- ===== GIZMO TEMP (delete this whole block on next prompt) =====
-if not _G.SBGizmo then _G.SBGizmo = {} end
 local function clearSBGizmo(refPart)
     local g = _G.SBGizmo[refPart]
     if g then
@@ -168,38 +146,40 @@ local function drawSBGizmo(refPart)
     _G.SBGizmo[refPart] = made
 end
 -- ===== GIZMO TEMP END =====
-getgenv().GingerRunId = (getgenv().GingerRunId or 0) + 1
-local MY_RUN = getgenv().GingerRunId
-if not _G.GingerHipLocked then _G.GingerHipLocked = {} end
-if not _G.GingerMeshOrig then _G.GingerMeshOrig = {} end
+
+local function isSBMesh(meshid)
+    return (meshid:find(BLOSSOM_MESH) ~= nil) or (meshid:find(SUNRISE_MESH) ~= nil)
+end
 
 local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     local isDisplay = (weapontype == nil) or (refPart:FindFirstAncestorOfClass("Tool") == nil)
     if not weaponData or not weaponData.meshid then
-        -- Unknown gun: straighten slot (SB yaw never sticks) + release stale Ginger.
-        if isDisplay then restoreSB(refPart) end
-        if isDisplay and _G.GingerHipLocked[refPart] then
-            local snap = _G.GingerMeshOrig[refPart]
-            if snap then
-                if refPart:IsA("MeshPart") then
-                    if snap.MeshId then refPart.MeshId = snap.MeshId end
-                    if snap.TextureID then refPart.TextureID = snap.TextureID end
-                else
-                    local m0 = refPart:FindFirstChildOfClass("SpecialMesh")
-                    if m0 then
-                        if snap.MeshId then m0.MeshId = snap.MeshId end
-                        if snap.TextureId then m0.TextureId = snap.TextureId end
-                        if snap.Scale then m0.Scale = snap.Scale * OTHER_SCALE end
+        -- Unknown gun: clear our visuals so the slot shows game default.
+        if isDisplay then
+            clearSBGizmo(refPart)
+            if _G.GingerHipLocked[refPart] then
+                local snap = _G.GingerMeshOrig[refPart]
+                if snap then
+                    if refPart:IsA("MeshPart") then
+                        if snap.MeshId then refPart.MeshId = snap.MeshId end
+                        if snap.TextureID then refPart.TextureID = snap.TextureID end
+                    else
+                        local m0 = refPart:FindFirstChildOfClass("SpecialMesh")
+                        if m0 then
+                            if snap.MeshId then m0.MeshId = snap.MeshId end
+                            if snap.TextureId then m0.TextureId = snap.TextureId end
+                            if snap.Scale then m0.Scale = snap.Scale end
+                        end
                     end
                 end
+                _G.GingerHipLocked[refPart] = nil
+                _G.GingerMeshOrig[refPart] = nil
             end
-            _G.GingerHipLocked[refPart] = nil
-            _G.GingerMeshOrig[refPart] = nil
-            restoreSB(refPart)
         end
         return
     end
     local isGinger = weaponData.meshid:find(GINGER_ID) ~= nil
+    local isSB = isSBMesh(weaponData.meshid)
 
     if isGinger and isDisplay and _G.GingerHipLocked[refPart] then
         -- Validate lock: game resets preview meshes on spawn/refresh. Re-apply if lost.
@@ -214,10 +194,9 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         end
         if stillFlipped then return end
         _G.GingerHipLocked[refPart] = nil
-        restoreSB(refPart)
     end
 
-    -- ORIGINAL Grip logic untouched (hand default).
+    -- ORIGINAL Grip logic untouched (hand default for everything).
     if weaponData.meshid:find("79401392") then
         if weapontype == "Gun" then
             local tool = refPart:FindFirstAncestorOfClass("Tool")
@@ -252,12 +231,10 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
     end
 
     if refPart:IsA("MeshPart") then
-        if isGinger and isDisplay and not _G.GingerMeshOrig[refPart] then
+        if (isGinger or isSB) and isDisplay and not _G.GingerMeshOrig[refPart] then
             _G.GingerMeshOrig[refPart] = {MeshId = refPart.MeshId, TextureID = refPart.TextureID}
         end
-        -- Non-ginger MeshPart cross-type guard: only same-type shows, else restore/leave.
-        if not isGinger then
-            if isDisplay then restoreSB(refPart) end
+        if not isGinger and not isSB then
             if _G.GingerHipLocked[refPart] then
                 local snap = _G.GingerMeshOrig[refPart]
                 if snap then
@@ -266,8 +243,8 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
-                restoreSB(refPart)
             end
+            clearSBGizmo(refPart)
             if (weaponData.kind or "FileMesh") ~= "MeshPart" then return end
         end
         local specialMesh = refPart:FindFirstChildOfClass("SpecialMesh")
@@ -275,7 +252,6 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
         refPart.MeshId = weaponData.meshid
         refPart.TextureID = weaponData.textureid
         if isGinger and isDisplay then _G.GingerHipLocked[refPart] = true end
-        if not isGinger then refPart.Size = weaponData.size * OTHER_SCALE end
     else
         local mesh = refPart:FindFirstChildOfClass("SpecialMesh")
         if not mesh then
@@ -287,7 +263,7 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             if not _G.GingerMeshOrig[refPart] then
                 _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
             end
-            -- Proven flip+shrink. No joints, no CFrames: cannot spin player.
+            -- Proven flip+shrink. Scale only: cannot spin player.
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
             mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE,-GINGER_DISPLAY_SCALE)
@@ -298,101 +274,33 @@ local function applyWeaponMesh(refPart, weaponData, weaponName, weapontype)
             mesh.TextureId = weaponData.textureid
             mesh.Scale = Vector3.new(GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE,GINGER_DISPLAY_SCALE)
         else
-            -- Other guns: straighten slot first (SB yaw never sticks), then release
-            -- stale Ginger, same-type IDs only so never giant.
-            if isDisplay then restoreSB(refPart) end
+            -- Other guns: release stale custom visuals, same-type IDs only so never giant.
             if _G.GingerHipLocked[refPart] then
                 local snap = _G.GingerMeshOrig[refPart]
                 if snap then
                     if snap.MeshId then mesh.MeshId = snap.MeshId end
                     if snap.TextureId then mesh.TextureId = snap.TextureId end
-                    if snap.Scale then mesh.Scale = snap.Scale * OTHER_SCALE end
+                    if snap.Scale then mesh.Scale = snap.Scale end
                 end
                 _G.GingerHipLocked[refPart] = nil
                 _G.GingerMeshOrig[refPart] = nil
-                restoreSB(refPart)
             end
+            clearSBGizmo(refPart)
             if (weaponData.kind or "FileMesh") ~= "FileMesh" then
-                -- cross-type new MeshPart gun in old Part slot: restore default look instead of giant
-                local snap2 = _G.GingerMeshOrig[refPart]
-                if snap2 then
-                    if snap2.MeshId then mesh.MeshId = snap2.MeshId end
-                    if snap2.TextureId then mesh.TextureId = snap2.TextureId end
-                    if snap2.Scale then mesh.Scale = snap2.Scale * OTHER_SCALE end
-                end
                 return
             end
             mesh.MeshId = weaponData.meshid
             mesh.TextureId = weaponData.textureid
-            -- Sunrise + Blossom hip: same Ginger X-flip, own magnitude so size unchanged.
-            local mid = weaponData.meshid or ""
-            local flipHip = false -- rotations off: plain default look
-            if flipHip then
-            if flipHip then
+            if isSB and isDisplay then
+                -- Sunrise/Blossom hip mirror, own magnitude so size unchanged.
+                if not _G.GingerMeshOrig[refPart] then
+                    _G.GingerMeshOrig[refPart] = {MeshId = mesh.MeshId, TextureId = mesh.TextureId, Scale = mesh.Scale}
+                end
                 local s0 = weaponData.scale
                 mesh.Scale = Vector3.new(-math.abs(s0.X),math.abs(s0.Y),math.abs(s0.Z))
-                -- Yaw 90 only if nothing ties this part to your character (local check).
-                local char = game.Players.LocalPlayer.Character
-                local tied = char and refPart:IsDescendantOf(char)
-                if not tied and char then
-                    local function linkedToChar(inst)
-                        if inst:IsA("Motor6D") or inst:IsA("Weld") or inst:IsA("WeldConstraint") then
-                            local o = (inst.Part0 == refPart) and inst.Part1 or ((inst.Part1 == refPart) and inst.Part0 or nil)
-                            if o and o:IsDescendantOf(char) then return true end
-                        elseif inst:IsA("RigidConstraint") then
-                            local a0 = inst.Attachment0 and inst.Attachment0.Parent
-                            local a1 = inst.Attachment1 and inst.Attachment1.Parent
-                            local o = (a0 == refPart) and a1 or ((a1 == refPart) and a0 or nil)
-                            if o and o:IsDescendantOf(char) then return true end
-                        end
-                        return false
-                    end
-                    for _, c in ipairs(refPart:GetChildren()) do
-                        if linkedToChar(c) then tied = true break end
-                    end
-                    if not tied and refPart.Parent then
-                        for _, c in ipairs(refPart.Parent:GetChildren()) do
-                            if (c:IsA("Motor6D") or c:IsA("Weld") or c:IsA("WeldConstraint") or c:IsA("RigidConstraint")) and linkedToChar(c) then
-                                tied = true break
-                            end
-                        end
-                    end
-                end
-                if not tied then
-                    _G.SBBase[refPart] = _G.SBBase[refPart] or refPart.CFrame
-                    refPart.CFrame = _G.SBBase[refPart] * CFrame.Angles(0,math.rad(-90),0)
-                    _G.SBApplied[refPart] = true
-                else
-                    -- Tied: rotate item-side only. Motor/Weld C0 when display is Part1,
-                    -- else own Attachments. Never touches character side.
-                    local moved = false
-                    local function tryJoint(inst)
-                        if (inst:IsA("Motor6D") or inst:IsA("Weld")) and inst.Part1 == refPart then
-                            if not _G.SBJointOrig[inst] then _G.SBJointOrig[inst] = inst.C0 end
-                            inst.C0 = _G.SBJointOrig[inst] * CFrame.Angles(0,math.rad(-90),0)
-                            moved = true
-                        end
-                    end
-                    for _, c in ipairs(refPart:GetChildren()) do tryJoint(c) end
-                    if refPart.Parent then
-                        for _, c in ipairs(refPart.Parent:GetChildren()) do tryJoint(c) end
-                    end
-                    if not moved then
-                        for _, a in ipairs(refPart:GetChildren()) do
-                            if a:IsA("Attachment") then
-                                if not _G.SBAttachOrig[a] then _G.SBAttachOrig[a] = a.CFrame end
-                                a.CFrame = _G.SBAttachOrig[a] * CFrame.Angles(0,math.rad(-90),0)
-                                moved = true
-                            end
-                        end
-                    end
-                    if moved then _G.SBApplied[refPart] = true end
-                end
+                drawSBGizmo(refPart)
             else
-                mesh.Scale = weaponData.scale * OTHER_SCALE
-                if isDisplay and (mid:find("12322809632") or mid:find("109742397574153")) then
-                    drawSBGizmo(refPart)
-                end
+                mesh.Scale = weaponData.scale
             end
         end
     end
@@ -487,8 +395,6 @@ while wait() do
                 local gundata = getWeaponData(equippedGunName)
                 if gundata and gundata.meshid and gundata.textureid and gundata.scale and gundata.size then
                     applyWeaponMesh(refVal, gundata, equippedGunName)
-                elseif _G.GingerHipLocked[refVal] then
-                    applyWeaponMesh(refVal, nil, equippedGunName)
                 end
             end
         end
@@ -499,8 +405,6 @@ while wait() do
                 local knifedata = getWeaponData(equippedKnifeName)
                 if knifedata and knifedata.meshid and knifedata.textureid and knifedata.scale and knifedata.size then
                     applyWeaponMesh(refVal, knifedata, equippedKnifeName)
-                elseif _G.GingerHipLocked[refVal] then
-                    applyWeaponMesh(refVal, nil, equippedKnifeName)
                 end
             end
         end
